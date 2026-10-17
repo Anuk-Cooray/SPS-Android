@@ -321,6 +321,16 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const Divider(),
                   ListTile(
+                    leading: Icon(Icons.analytics_outlined, color: c.textPrimary),
+                    title: Text(
+                      'Live Admin & Research Metrics',
+                      style: AppText.title.copyWith(color: c.textPrimary),
+                    ),
+                    trailing: Icon(Icons.chevron_right_rounded, color: c.textSecondary),
+                    onTap: () => Navigator.pushNamed(context, '/admin'),
+                  ),
+                  const Divider(),
+                  ListTile(
                     title: Text(
                       'Log out',
                       style: AppText.title.copyWith(color: c.danger),
