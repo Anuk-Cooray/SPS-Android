@@ -1,13 +1,13 @@
-# AI Vision-Based Smart Parking System (SPS)
+# Smart Parking System (SPS)
 **SLIIT Research Project J26-IT-335**
 
-An intelligent, multi-agent smart parking management mobile application with dynamic slot re-optimization, CCTV vision integration, QR barrier automation, and smart billing.
+A mobile application for intelligent parking lot management, featuring dynamic slot re-optimization, vision-based occupancy monitoring, automated QR barrier access, and digital billing.
 
 ---
 
 ## Team Components & Architecture
 
-This repository is organized using a **Feature-First Architecture** so team members can work in parallel without merge conflicts:
+This repository is organized using a **Feature-First Architecture** so team members can work in parallel on their respective modules:
 
 | Component | Lead | Directory | Contract Interface |
 |---|---|---|---|
@@ -32,7 +32,7 @@ lib/
 └── features/
     ├── auth/           # M1: Login, OTP verification & vehicle onboarding
     ├── home_map/       # M2/M3: Campus map explorer & nearby lot sheets
-    ├── reoptimization/ # M4-M8: AI slot scoring, navigation, dynamic upgrade offers, late auto-cancel
+    ├── reoptimization/ # M4-M8: Slot scoring, navigation, dynamic upgrade offers, late auto-cancel
     ├── barrier_checkin/# M9-M10: QR generation, gate barrier trigger, Find My Car
     ├── billing/        # M11: Billing calculation, invoice breakdown, digital payment
     ├── profile/        # M14: Multi-vehicle manager & driver preferences
