@@ -13,9 +13,11 @@ import '../models/parking_lot_model.dart';
 import '../models/parking_slot_model.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
+import 'firestore_service.dart';
 import 'mock_data.dart';
 
 class ParkingStateManager extends ChangeNotifier {
+  final FirestoreService _firestore = FirestoreService();
   User _currentUser = MockData.initialUser;
   bool _isLoggedIn = false;
   bool _isInitialized = false;
@@ -399,6 +401,7 @@ class ParkingStateManager extends ChangeNotifier {
 
     _bookings.insert(0, newBooking);
     _currentActiveBooking = newBooking;
+    _firestore.saveBooking(newBooking);
     _etaMinutes = _initialEtaMinutes;
     _distanceKm = _initialDistanceKm;
     _routeProgress = 0.0;
@@ -595,6 +598,7 @@ class ParkingStateManager extends ChangeNotifier {
     _currentActiveBooking = updatedBooking;
     _upgradeOfferAvailable = false;
     _upgradeCandidateSlot = null;
+    _firestore.saveBooking(updatedBooking);
 
     _logEvent(
       bookingId: updatedBooking.id,
@@ -634,6 +638,7 @@ class ParkingStateManager extends ChangeNotifier {
       _bookings[idx] = updated;
     }
     _currentActiveBooking = updated;
+    _firestore.saveBooking(updated);
 
     _logEvent(
       bookingId: updated.id,
@@ -658,6 +663,7 @@ class ParkingStateManager extends ChangeNotifier {
       _bookings[idx] = updated;
     }
     _currentActiveBooking = updated;
+    _firestore.saveBooking(updated);
 
     _logEvent(
       bookingId: updated.id,
@@ -703,6 +709,7 @@ class ParkingStateManager extends ChangeNotifier {
       _bookings[idx] = updated;
     }
     _currentActiveBooking = null;
+    _firestore.saveBooking(updated);
 
     _logEvent(
       bookingId: updated.id,
@@ -750,6 +757,7 @@ class ParkingStateManager extends ChangeNotifier {
       _bookings[idx] = updated;
     }
     _currentActiveBooking = null;
+    _firestore.saveBooking(updated);
 
     _logEvent(
       bookingId: updated.id,

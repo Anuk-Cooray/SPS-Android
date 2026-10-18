@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
@@ -5,6 +6,7 @@ import 'data/models/booking_model.dart';
 import 'data/models/parking_lot_model.dart';
 import 'data/models/parking_slot_model.dart';
 import 'data/models/vehicle_model.dart';
+import 'data/services/firestore_service.dart';
 import 'data/services/parking_state_manager.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/auth/login_screen.dart';
@@ -18,8 +20,14 @@ import 'features/reoptimization/late_arrival_screen.dart';
 import 'features/reoptimization/navigation_screen.dart';
 import 'features/reoptimization/upgrade_offer_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    FirestoreService().initialize();
+  } catch (e) {
+    debugPrint('[Firebase] Initialization skipped or running offline: $e');
+  }
   runApp(
     ChangeNotifierProvider(
       create: (_) => ParkingStateManager(),
