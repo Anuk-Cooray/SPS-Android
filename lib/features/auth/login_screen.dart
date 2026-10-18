@@ -20,20 +20,32 @@ class _LoginScreenState extends State<LoginScreen> {
       List.generate(6, (i) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (i) => FocusNode());
 
-  int _resendCountdown = 42;
+  int _resendCountdown = 0;
   Timer? _timer;
+  bool _isLoading = false;
+  String? _emailError;
+  String? _otpError;
 
   @override
   void initState() {
     super.initState();
-    // Pre-fill first 3 digits as in mockup
+    // Pre-fill demo digits
     _otpControllers[0].text = '4';
     _otpControllers[1].text = '8';
     _otpControllers[2].text = '2';
+    _otpControllers[3].text = '1';
+    _otpControllers[4].text = '0';
+    _otpControllers[5].text = '0';
+  }
 
+  void _startCountdown() {
+    _timer?.cancel();
+    _resendCountdown = 60;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_resendCountdown > 0) {
         setState(() => _resendCountdown--);
+      } else {
+        timer.cancel();
       }
     });
   }
@@ -51,12 +63,63 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleContinue() {
+  bool _validateEmail(String email) {
+    final emailRegex = RegExp(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$');
+    return emailRegex.hasMatch(email);
+  }
+
+  String _getOtpValue() {
+    return _otpControllers.map((c) => c.text.trim()).join();
+  }
+
+  void _handleContinue() async {
     final email = _emailController.text.trim();
-    if (email.isNotEmpty) {
-      context.read<ParkingStateManager>().login(email);
-      widget.onLoginSuccess();
+    final otp = _getOtpValue();
+
+    bool hasError = false;
+
+    if (email.isEmpty) {
+      setState(() => _emailError = 'Please enter your email address');
+      hasError = true;
+    } else if (!_validateEmail(email)) {
+      setState(() => _emailError = 'Please enter a valid email address (e.g. name@sliit.lk)');
+      hasError = true;
+    } else {
+      setState(() => _emailError = null);
     }
+
+    if (otp.length < 6) {
+      setState(() => _otpError = 'Please enter the complete 6-digit verification code');
+      hasError = true;
+    } else {
+      setState(() => _otpError = null);
+    }
+
+    if (hasError) return;
+
+    setState(() => _isLoading = true);
+
+    if (mounted) {
+      await context.read<ParkingStateManager>().login(email);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        widget.onLoginSuccess();
+      }
+    }
+  }
+
+  void _fillNewUserDemo() {
+    setState(() {
+      _emailController.text = 'newdriver@sliit.lk';
+      _otpControllers[0].text = '9';
+      _otpControllers[1].text = '9';
+      _otpControllers[2].text = '8';
+      _otpControllers[3].text = '8';
+      _otpControllers[4].text = '7';
+      _otpControllers[5].text = '7';
+      _emailError = null;
+      _otpError = null;
+    });
   }
 
   @override
@@ -66,29 +129,51 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: c.background,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: AppSpace.xxl),
+              const SizedBox(height: AppSpace.xl),
 
-              // Logo badge
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: c.primary,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'P',
-                  style: AppText.h1.copyWith(
-                    color: c.onPrimary,
-                    fontWeight: FontWeight.w800,
+              // Top Logo Badge & Demo Fast-Fill
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: c.primary,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'P',
+                      style: AppText.h1.copyWith(
+                        color: c.onPrimary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ),
+                  OutlinedButton.icon(
+                    onPressed: _fillNewUserDemo,
+                    icon: Icon(Icons.person_add_alt_1_rounded, size: 16, color: c.accent),
+                    label: Text(
+                      'Test New User',
+                      style: AppText.caption.copyWith(
+                        color: c.accent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      side: BorderSide(color: c.accent.withValues(alpha: 0.4)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
               ),
 
               const SizedBox(height: AppSpace.xl),
@@ -99,18 +184,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: AppText.h1.copyWith(color: c.textPrimary),
               ),
 
-              const SizedBox(height: AppSpace.sm),
+              const SizedBox(height: AppSpace.xs),
 
               // Subtitle
               Text(
-                "Enter your email. We'll send you a 6-digit verification code.",
+                "Enter your campus email. We'll send you a 6-digit verification code.",
                 style: AppText.body.copyWith(color: c.textSecondary),
               ),
 
-              const SizedBox(height: AppSpace.xxl),
+              const SizedBox(height: AppSpace.xl),
 
               // Email Field
-              Text('Email', style: AppText.label.copyWith(color: c.textSecondary)),
+              Text('Email Address', style: AppText.label.copyWith(color: c.textSecondary)),
               const SizedBox(height: AppSpace.xs),
               TextField(
                 controller: _emailController,
@@ -125,23 +210,36 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: c.textSecondary,
                     size: 20,
                   ),
-                  hintText: 'name@example.com',
+                  hintText: 'e.g. anuk@sliit.lk',
+                  errorText: _emailError,
                 ),
+                onChanged: (_) {
+                  if (_emailError != null) setState(() => _emailError = null);
+                },
               ),
 
               const SizedBox(height: AppSpace.xl),
 
               // Verification code
-              Text(
-                'Verification code',
-                style: AppText.label.copyWith(color: c.textSecondary),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Verification Code',
+                    style: AppText.label.copyWith(color: c.textSecondary),
+                  ),
+                  Text(
+                    'Demo code: 482100',
+                    style: AppText.caption.copyWith(color: c.accent, fontWeight: FontWeight.w600),
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpace.xs),
 
+              // 6 Digits Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(6, (index) {
-                  final isFocused = index == 3;
                   return SizedBox(
                     width: 48,
                     height: 56,
@@ -150,8 +248,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: c.surface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isFocused ? c.accent : c.border,
-                          width: isFocused ? 2 : 1,
+                          color: _focusNodes[index].hasFocus ? c.accent : c.border,
+                          width: _focusNodes[index].hasFocus ? 2 : 1,
                         ),
                       ),
                       alignment: Alignment.center,
@@ -173,8 +271,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           contentPadding: EdgeInsets.zero,
                         ),
                         onChanged: (val) {
+                          if (_otpError != null) {
+                            setState(() => _otpError = null);
+                          }
                           if (val.isNotEmpty && index < 5) {
                             _focusNodes[index + 1].requestFocus();
+                          } else if (val.isEmpty && index > 0) {
+                            _focusNodes[index - 1].requestFocus();
                           }
                         },
                       ),
@@ -183,24 +286,57 @@ class _LoginScreenState extends State<LoginScreen> {
                 }),
               ),
 
+              if (_otpError != null) ...[
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  _otpError!,
+                  style: AppText.caption.copyWith(color: c.danger, fontSize: 12),
+                ),
+              ],
+
               const SizedBox(height: AppSpace.sm),
 
-              Text(
-                'Code sent to your inbox · Resend in 0:${_resendCountdown.toString().padLeft(2, '0')}',
-                style: AppText.caption.copyWith(color: c.textSecondary),
+              // Resend countdown
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _resendCountdown > 0
+                        ? 'Code sent to inbox · Resend in 0:${_resendCountdown.toString().padLeft(2, '0')}'
+                        : 'Did not receive code?',
+                    style: AppText.caption.copyWith(color: c.textSecondary),
+                  ),
+                  if (_resendCountdown == 0)
+                    InkWell(
+                      onTap: () {
+                        _startCountdown();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('A fresh 6-digit code has been sent.')),
+                        );
+                      },
+                      child: Text(
+                        'Resend code',
+                        style: AppText.caption.copyWith(
+                          color: c.accent,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
               ),
 
-              const Spacer(),
+              const SizedBox(height: AppSpace.xxl),
 
               // Continue Button
               PrimaryButton(
-                text: 'Continue',
+                text: 'Verify & Continue',
+                isLoading: _isLoading,
                 onPressed: _handleContinue,
               ),
 
               const SizedBox(height: AppSpace.md),
 
-              // Terms
+              // Terms & Conditions
               Center(
                 child: Text.rich(
                   TextSpan(
@@ -228,7 +364,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: AppSpace.md),
+              const SizedBox(height: AppSpace.xl),
             ],
           ),
         ),

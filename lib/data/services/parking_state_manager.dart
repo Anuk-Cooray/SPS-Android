@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/reoptimization/engine/reoptimization_engine.dart';
 import '../../features/reoptimization/engine/scoring_weights.dart';
@@ -14,7 +16,8 @@ import 'mock_data.dart';
 
 class ParkingStateManager extends ChangeNotifier {
   User _currentUser = MockData.initialUser;
-  bool _isLoggedIn = true;
+  bool _isLoggedIn = false;
+  bool _isInitialized = false;
   final List<ParkingLot> _lots = MockData.getInitialLots();
   final List<Booking> _bookings = MockData.getInitialBookings();
   final List<ParkingEvent> _events = [];
@@ -33,6 +36,38 @@ class ParkingStateManager extends ChangeNotifier {
   ParkingStateManager() {
     _refreshActiveBooking();
     _initializeMockEvents();
+    _initSession();
+  }
+
+  Future<void> _initSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final loggedIn = prefs.getBool('sp_is_logged_in') ?? false;
+      final userJson = prefs.getString('sp_user_profile');
+
+      if (loggedIn && userJson != null) {
+        final decoded = jsonDecode(userJson) as Map<String, dynamic>;
+        _currentUser = User.fromJson(decoded);
+        _isLoggedIn = true;
+      } else {
+        _isLoggedIn = false;
+      }
+    } catch (_) {
+      _isLoggedIn = false;
+    } finally {
+      _isInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    }
+  }
+
+  Future<void> _persistSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('sp_is_logged_in', _isLoggedIn);
+      await prefs.setString('sp_user_profile', jsonEncode(_currentUser.toJson()));
+    } catch (_) {}
   }
 
   void _initializeMockEvents() {
@@ -79,6 +114,8 @@ class ParkingStateManager extends ChangeNotifier {
   // Getters
   User get currentUser => _currentUser;
   bool get isLoggedIn => _isLoggedIn;
+  bool get isInitialized => _isInitialized;
+  bool get hasRegisteredVehicle => _currentUser.vehicles.isNotEmpty;
   List<ParkingLot> get lots => _lots;
   List<Booking> get bookings => _bookings;
   List<ParkingEvent> get events => _events;
@@ -120,18 +157,42 @@ class ParkingStateManager extends ChangeNotifier {
   }
 
   // Auth & Profile
-  void login(String email) {
+  Future<void> login(String email) async {
     _isLoggedIn = true;
-    _currentUser = _currentUser.copyWith(email: email);
+    if (email.toLowerCase() == 'anuk@example.com' || email.toLowerCase() == 'demo@example.com') {
+      _currentUser = MockData.initialUser.copyWith(email: email);
+    } else {
+      _currentUser = User(
+        id: 'user-${DateTime.now().millisecondsSinceEpoch}',
+        name: email.split('@').first,
+        email: email,
+        phone: '+94 77 123 4567',
+        vehicles: const [],
+        preferences: const UserPreferences(),
+      );
+    }
+    await _persistSession();
     notifyListeners();
   }
 
-  void logout() {
+  Future<void> completeVehicleOnboarding(Vehicle vehicle) async {
+    final updatedVehicles = [vehicle.copyWith(isDefault: true)];
+    _currentUser = _currentUser.copyWith(vehicles: updatedVehicles);
+    await _persistSession();
+    notifyListeners();
+  }
+
+  Future<void> logout() async {
     _isLoggedIn = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('sp_is_logged_in');
+      await prefs.remove('sp_user_profile');
+    } catch (_) {}
     notifyListeners();
   }
 
-  void addVehicle(Vehicle vehicle) {
+  Future<void> addVehicle(Vehicle vehicle) async {
     final updated = List<Vehicle>.from(_currentUser.vehicles);
     if (vehicle.isDefault) {
       for (int i = 0; i < updated.length; i++) {
@@ -140,19 +201,22 @@ class ParkingStateManager extends ChangeNotifier {
     }
     updated.add(vehicle);
     _currentUser = _currentUser.copyWith(vehicles: updated);
+    await _persistSession();
     notifyListeners();
   }
 
-  void setDefaultVehicle(String vehicleId) {
+  Future<void> setDefaultVehicle(String vehicleId) async {
     final updated = _currentUser.vehicles.map((v) {
       return v.copyWith(isDefault: v.id == vehicleId);
     }).toList();
     _currentUser = _currentUser.copyWith(vehicles: updated);
+    await _persistSession();
     notifyListeners();
   }
 
-  void updatePreferences(UserPreferences prefs) {
+  Future<void> updatePreferences(UserPreferences prefs) async {
     _currentUser = _currentUser.copyWith(preferences: prefs);
+    await _persistSession();
     notifyListeners();
   }
 

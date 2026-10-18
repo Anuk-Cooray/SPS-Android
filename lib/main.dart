@@ -8,6 +8,7 @@ import 'data/models/vehicle_model.dart';
 import 'data/services/parking_state_manager.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/auth/login_screen.dart';
+import 'features/auth/vehicle_onboarding_screen.dart';
 import 'features/barrier_checkin/check_in_screen.dart';
 import 'features/barrier_checkin/parked_screen.dart';
 import 'features/billing/pay_and_exit_screen.dart';
@@ -35,8 +36,6 @@ class SmartParkingApp extends StatefulWidget {
 }
 
 class _SmartParkingAppState extends State<SmartParkingApp> {
-  bool _isLoggedIn = true;
-
   void _openLotBooking(BuildContext context, ParkingLot lot) {
     Navigator.push(
       context,
@@ -169,30 +168,46 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
-      home: _isLoggedIn
-          ? Builder(
-              builder: (ctx) => NavigationShell(
-                onSelectLot: (lot) => _openLotBooking(ctx, lot),
-                onOpenActiveBooking: (booking) {
-                  if (booking.status == BookingStatus.checkedIn) {
-                    _openParked(ctx, booking);
-                  } else {
-                    _openNavigation(ctx, booking);
-                  }
-                },
-                onLogout: () {
-                  setState(() => _isLoggedIn = false);
-                },
-              ),
-            )
-          : LoginScreen(
-              onLoginSuccess: () {
-                setState(() => _isLoggedIn = true);
-              },
-            ),
       routes: {
         '/admin': (_) => const AdminDashboardScreen(),
       },
+      home: Consumer<ParkingStateManager>(
+        builder: (context, state, _) {
+          if (!state.isInitialized) {
+            return const Scaffold(
+              body: SizedBox.shrink(),
+            );
+          }
+
+          if (!state.isLoggedIn) {
+            return LoginScreen(
+              onLoginSuccess: () {},
+            );
+          }
+
+          if (!state.hasRegisteredVehicle) {
+            return VehicleOnboardingScreen(
+              onOnboardingComplete: () {},
+            );
+          }
+
+          return Builder(
+            builder: (ctx) => NavigationShell(
+              onSelectLot: (lot) => _openLotBooking(ctx, lot),
+              onOpenActiveBooking: (booking) {
+                if (booking.status == BookingStatus.checkedIn) {
+                  _openParked(ctx, booking);
+                } else {
+                  _openNavigation(ctx, booking);
+                }
+              },
+              onLogout: () {
+                state.logout();
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 }

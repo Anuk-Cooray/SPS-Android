@@ -63,6 +63,37 @@ class User {
     return vehicles.firstWhere((v) => v.isDefault, orElse: () => vehicles.first);
   }
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'vehicles': vehicles.map((v) => v.toJson()).toList(),
+        'preferences': preferences.toJson(),
+        'paymentMethods': paymentMethods,
+        'defaultPaymentMethod': defaultPaymentMethod,
+      };
+
+  factory User.fromJson(Map<String, dynamic> json) => User(
+        id: json['id'] as String? ?? 'user-001',
+        name: json['name'] as String? ?? 'Driver',
+        email: json['email'] as String? ?? '',
+        phone: json['phone'] as String? ?? '+94 77 123 4567',
+        vehicles: (json['vehicles'] as List<dynamic>?)
+                ?.map((v) => Vehicle.fromJson(v as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        preferences: json['preferences'] != null
+            ? UserPreferences.fromJson(json['preferences'] as Map<String, dynamic>)
+            : const UserPreferences(),
+        paymentMethods: (json['paymentMethods'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const ['Visa •••• 4821'],
+        defaultPaymentMethod:
+            json['defaultPaymentMethod'] as String? ?? 'Visa •••• 4821',
+      );
+
   User copyWith({
     String? id,
     String? name,

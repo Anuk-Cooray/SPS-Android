@@ -48,7 +48,15 @@ class PrimaryButton extends StatelessWidget {
                     Icon(icon, size: 20),
                     const SizedBox(width: AppSpace.xs),
                   ],
-                  Text(text, style: AppText.button.copyWith(color: c.onPrimary)),
+                  Flexible(
+                    child: Text(
+                      text,
+                      style: AppText.button.copyWith(color: c.onPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ],
               ),
       ),
@@ -91,7 +99,15 @@ class SecondaryButton extends StatelessWidget {
               Icon(icon, size: 18),
               const SizedBox(width: AppSpace.xs),
             ],
-            Text(text, style: AppText.button.copyWith(fontSize: 15)),
+            Flexible(
+              child: Text(
+                text,
+                style: AppText.button.copyWith(fontSize: 15),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
           ],
         ),
       ),
