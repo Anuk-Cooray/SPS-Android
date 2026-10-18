@@ -151,7 +151,7 @@ class _AlertsPlaceholderView extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'AI slot re-optimization is active for your account.',
+                        'Dynamic slot re-optimization is active for your account.',
                         style: AppText.caption.copyWith(color: c.textSecondary),
                       ),
                     ],

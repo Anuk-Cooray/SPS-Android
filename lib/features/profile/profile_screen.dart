@@ -272,7 +272,7 @@ class ProfileScreen extends StatelessWidget {
                       style: AppText.title.copyWith(color: c.textPrimary),
                     ),
                     subtitle: Text(
-                      'Weights the AI slot pick',
+                      'Prioritizes bays closer to building entrances',
                       style: AppText.caption.copyWith(color: c.textSecondary),
                     ),
                     value: prefs.preferNearEntrance,
