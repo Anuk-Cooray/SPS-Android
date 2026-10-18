@@ -8,6 +8,7 @@ class CampusMapView extends StatelessWidget {
   final ValueChanged<ParkingLot>? onLotSelected;
   final bool showNavigationRoute;
   final String? destinationSlotId;
+  final double routeProgress;
 
   const CampusMapView({
     super.key,
@@ -16,6 +17,7 @@ class CampusMapView extends StatelessWidget {
     this.onLotSelected,
     this.showNavigationRoute = false,
     this.destinationSlotId,
+    this.routeProgress = 0.0,
   });
 
   @override
@@ -30,6 +32,7 @@ class CampusMapView extends StatelessWidget {
             painter: _MapCanvasPainter(
               colors: c,
               showRoute: showNavigationRoute,
+              routeProgress: routeProgress,
             ),
           ),
         ),
@@ -126,8 +129,13 @@ class CampusMapView extends StatelessWidget {
 class _MapCanvasPainter extends CustomPainter {
   final AppColors colors;
   final bool showRoute;
+  final double routeProgress;
 
-  _MapCanvasPainter({required this.colors, required this.showRoute});
+  _MapCanvasPainter({
+    required this.colors,
+    required this.showRoute,
+    this.routeProgress = 0.0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -234,28 +242,23 @@ class _MapCanvasPainter extends CustomPainter {
       roadPaint,
     );
 
-    // 4. Current user location dot
-    final userDotCenter = Offset(size.width * 0.42, size.height * 0.24);
-    canvas.drawCircle(
-      userDotCenter,
-      9,
-      Paint()..color = colors.surface,
-    );
-    canvas.drawCircle(
-      userDotCenter,
-      5,
-      Paint()..color = colors.textPrimary,
-    );
+    // 4. Current user location dot (shown when not in in-transit navigation mode)
+    if (!showRoute) {
+      final userDotCenter = Offset(size.width * 0.42, size.height * 0.24);
+      canvas.drawCircle(
+        userDotCenter,
+        9,
+        Paint()..color = colors.surface,
+      );
+      canvas.drawCircle(
+        userDotCenter,
+        5,
+        Paint()..color = colors.textPrimary,
+      );
+    }
 
-    // 5. Navigation Route Line (if navigation mode)
+    // 5. Navigation Route Line & Moving Vehicle Marker
     if (showRoute) {
-      final routePaint = Paint()
-        ..color = colors.mapRoute
-        ..strokeWidth = 5
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-
       final path = Path();
       final start = Offset(size.width * 0.42, size.height * 0.62);
       path.moveTo(start.dx, start.dy);
@@ -263,17 +266,86 @@ class _MapCanvasPainter extends CustomPainter {
       path.lineTo(size.width * 0.76, size.height * 0.36);
       path.lineTo(size.width * 0.76, size.height * 0.23);
 
-      canvas.drawPath(path, routePaint);
+      // Remaining planned route (subtle line)
+      final remainingPaint = Paint()
+        ..color = colors.mapRoute.withValues(alpha: 0.35)
+        ..strokeWidth = 5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(path, remainingPaint);
+
+      // Traveled route line (solid vibrant accent)
+      final pathMetrics = path.computeMetrics().toList();
+      if (pathMetrics.isNotEmpty) {
+        final metric = pathMetrics.first;
+        final totalLen = metric.length;
+        final currentDist = totalLen * routeProgress.clamp(0.0, 1.0);
+
+        if (currentDist > 0) {
+          final traveledPath = metric.extractPath(0, currentDist);
+          final traveledPaint = Paint()
+            ..color = colors.mapRoute
+            ..strokeWidth = 6
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round;
+          canvas.drawPath(traveledPath, traveledPaint);
+        }
+
+        // Draw animated vehicle marker at current position
+        final tangent = metric.getTangentForOffset(currentDist);
+        if (tangent != null) {
+          final carPos = tangent.position;
+
+          // Outer halo pulse
+          canvas.drawCircle(
+            carPos,
+            14,
+            Paint()..color = colors.mapRoute.withValues(alpha: 0.25),
+          );
+
+          // White border ring
+          canvas.drawCircle(
+            carPos,
+            9,
+            Paint()..color = Colors.white,
+          );
+
+          // Inner accent circle
+          canvas.drawCircle(
+            carPos,
+            6.5,
+            Paint()..color = colors.mapRoute,
+          );
+
+          // Directional heading arrow
+          final angle = tangent.angle;
+          canvas.save();
+          canvas.translate(carPos.dx, carPos.dy);
+          canvas.rotate(angle);
+
+          final headingPath = Path();
+          headingPath.moveTo(4, 0);
+          headingPath.lineTo(-3, -3);
+          headingPath.lineTo(-1, 0);
+          headingPath.lineTo(-3, 3);
+          headingPath.close();
+
+          canvas.drawPath(headingPath, Paint()..color = Colors.white);
+          canvas.restore();
+        }
+      }
 
       // Start circle dot
       canvas.drawCircle(
         start,
-        7,
+        6,
         Paint()..color = colors.mapRoute,
       );
       canvas.drawCircle(
         start,
-        3.5,
+        3,
         Paint()..color = colors.surface,
       );
     }
@@ -281,6 +353,8 @@ class _MapCanvasPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MapCanvasPainter oldDelegate) {
-    return oldDelegate.colors != colors || oldDelegate.showRoute != showRoute;
+    return oldDelegate.colors != colors ||
+        oldDelegate.showRoute != showRoute ||
+        oldDelegate.routeProgress != routeProgress;
   }
 }

@@ -1,13 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_parking/core/theme/app_theme.dart';
 import 'package:smart_parking/data/models/booking_model.dart';
 import 'package:smart_parking/data/models/parking_lot_model.dart';
 import 'package:smart_parking/data/models/parking_slot_model.dart';
 import 'package:smart_parking/data/models/user_model.dart';
 import 'package:smart_parking/data/models/vehicle_model.dart';
+import 'package:smart_parking/data/services/parking_state_manager.dart';
 import 'package:smart_parking/features/reoptimization/engine/reoptimization_engine.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('ReoptimizationEngine - Multi-Criteria Scoring (SYS-01)', () {
     late ReoptimizationEngine engine;
     late ParkingLot testLot;
@@ -273,6 +277,63 @@ void main() {
       expect(swapped.status, equals(BookingStatus.upgraded));
       expect(swapped.distanceSavedMeters, equals(120));
       expect(swapped.qrToken, startsWith('QR-UPGRADED-A-01'));
+    });
+  });
+
+  group('In-Transit Route Movement & ETA Simulation (SYS-03)', () {
+    late ParkingStateManager stateManager;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      stateManager = ParkingStateManager();
+    });
+
+    tearDown(() {
+      stateManager.dispose();
+    });
+
+    test('setRouteProgress updates distance, ETA and maneuver instructions', () {
+      expect(stateManager.routeProgress, equals(0.0));
+      expect(stateManager.etaMinutes, equals(12));
+      expect(stateManager.distanceKm, equals(4.2));
+      expect(stateManager.currentManeuverText, equals('Turn right onto New Kandy Rd'));
+
+      // Progress to 50%
+      stateManager.setRouteProgress(0.50);
+      expect(stateManager.routeProgress, equals(0.50));
+      expect(stateManager.distanceKm, equals(2.1));
+      expect(stateManager.etaMinutes, equals(6));
+      expect(stateManager.currentManeuverText, equals('Turn left at SLIIT Campus Gate'));
+
+      // Progress to 100% (Arrival)
+      stateManager.setRouteProgress(1.0);
+      expect(stateManager.hasArrivedAtDestination, isTrue);
+      expect(stateManager.distanceKm, equals(0.0));
+      expect(stateManager.etaMinutes, equals(0));
+      expect(stateManager.currentManeuverText, equals('Arrived at barrier. Ready to scan QR.'));
+    });
+
+    test('Advancing ETA into trigger window automatically activates dynamic upgrade check', () {
+      expect(stateManager.upgradeOfferAvailable, isFalse);
+
+      // Simulating movement from 12m to 8m (progress 0.35)
+      stateManager.setRouteProgress(0.35);
+      expect(stateManager.etaMinutes, lessThanOrEqualTo(10));
+      // Triggers candidate evaluation
+      expect(stateManager.lastUpgradeEvaluation, isNotNull);
+    });
+
+    test('tickSimulation increments progress and pauses at destination', () {
+      stateManager.resetMovementSimulation();
+      expect(stateManager.routeProgress, equals(0.0));
+
+      stateManager.tickSimulation(step: 0.20);
+      expect(stateManager.routeProgress, closeTo(0.20, 0.001));
+
+      stateManager.tickSimulation(step: 0.90);
+      expect(stateManager.routeProgress, equals(1.0));
+      expect(stateManager.hasArrivedAtDestination, isTrue);
+      expect(stateManager.isSimulatingMovement, isFalse);
     });
   });
 }

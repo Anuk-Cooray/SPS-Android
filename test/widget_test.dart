@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:smart_parking/core/theme/app_theme.dart';
 import 'package:smart_parking/data/services/mock_data.dart';
 import 'package:smart_parking/data/services/parking_state_manager.dart';
+import 'package:smart_parking/features/reoptimization/navigation_screen.dart';
 import 'package:smart_parking/main.dart';
 
 void main() {
@@ -122,5 +124,57 @@ void main() {
     // Verify BookSlotScreen opened safely and shows disabled/full status
     expect(find.text('Estimated fee'), findsOneWidget);
     expect(find.text('Lot is Full'), findsOneWidget);
+  });
+
+  testWidgets('Navigation screen renders simulation controls and updates ETA upon progress',
+      (WidgetTester tester) async {
+    setPhoneSize(tester);
+
+    SharedPreferences.setMockInitialValues({
+      'sp_is_logged_in': true,
+      'sp_user_profile': jsonEncode(MockData.initialUser.toJson()),
+    });
+
+    final manager = ParkingStateManager();
+    final lot = manager.lots.first;
+    final slot = lot.slots.firstWhere((s) => s.state == SlotState.free);
+    final booking = manager.reserveSlot(
+      lot: lot,
+      slot: slot,
+      arrivalTime: DateTime.now().add(const Duration(minutes: 12)),
+      durationHours: 2,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<ParkingStateManager>.value(
+        value: manager,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: NavigationScreen(
+            booking: booking,
+            onCancelBooking: () {},
+            onShowQr: () {},
+            onTriggerUpgradeOffer: () {},
+            onTriggerLateArrival: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify Navigation Screen elements
+    expect(find.text('12 min'), findsOneWidget);
+    expect(find.text('SIMULATION PAUSED'), findsOneWidget);
+    expect(find.byType(Slider), findsOneWidget);
+
+    // Tap Step forward button (+10%)
+    await tester.tap(find.byIcon(Icons.skip_next_rounded));
+    await tester.pumpAndSettle();
+
+    // Verify progress updated and ETA decreased
+    expect(manager.routeProgress, greaterThan(0.0));
+
+    manager.dispose();
   });
 }

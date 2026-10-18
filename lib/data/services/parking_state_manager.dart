@@ -1,5 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/reoptimization/engine/reoptimization_engine.dart';
@@ -26,10 +27,17 @@ class ParkingStateManager extends ChangeNotifier {
   final ReoptimizationEngine _engine = ReoptimizationEngine();
   UpgradeEvaluationResult? _lastUpgradeEvaluation;
 
-  // Active navigation / in-transit state
+  // Active navigation / in-transit state (SYS-03)
   Booking? _currentActiveBooking;
-  int _etaMinutes = 12;
-  double _distanceKm = 4.2;
+  static const double _initialDistanceKm = 4.2;
+  static const int _initialEtaMinutes = 12;
+  int _etaMinutes = _initialEtaMinutes;
+  double _distanceKm = _initialDistanceKm;
+  double _routeProgress = 0.0;
+  bool _isSimulatingMovement = false;
+  Timer? _simulationTimer;
+  bool _hasTriggeredAutoUpgrade = false;
+  bool _hasArrivedAtDestination = false;
   bool _upgradeOfferAvailable = false;
   ParkingSlot? _upgradeCandidateSlot;
 
@@ -122,6 +130,50 @@ class ParkingStateManager extends ChangeNotifier {
   Booking? get currentActiveBooking => _currentActiveBooking;
   int get etaMinutes => _etaMinutes;
   double get distanceKm => _distanceKm;
+  double get routeProgress => _routeProgress;
+  bool get isSimulatingMovement => _isSimulatingMovement;
+  bool get hasArrivedAtDestination => _hasArrivedAtDestination;
+
+  String get currentManeuverText {
+    if (_routeProgress >= 1.0) {
+      return 'Arrived at barrier. Ready to scan QR.';
+    } else if (_routeProgress >= 0.75) {
+      final lotName = _currentActiveBooking?.lotName ?? 'SLIIT Parking';
+      final slotId = _currentActiveBooking?.slotId ?? 'bay';
+      return 'Enter $lotName and proceed to $slotId';
+    } else if (_routeProgress >= 0.35) {
+      return 'Turn left at SLIIT Campus Gate';
+    } else {
+      return 'Turn right onto New Kandy Rd';
+    }
+  }
+
+  String get currentManeuverDistance {
+    if (_routeProgress >= 1.0) return '0 m';
+    if (_routeProgress < 0.35) {
+      final remainingM = ((0.35 - _routeProgress) * 4200).round();
+      return '$remainingM m';
+    } else if (_routeProgress < 0.75) {
+      final remainingM = ((0.75 - _routeProgress) * 4200).round();
+      return '$remainingM m';
+    } else {
+      final remainingM = ((1.0 - _routeProgress) * 4200).round();
+      return '$remainingM m';
+    }
+  }
+
+  IconData get currentManeuverIcon {
+    if (_routeProgress >= 1.0) {
+      return Icons.check_circle_rounded;
+    } else if (_routeProgress >= 0.75) {
+      return Icons.straight_rounded;
+    } else if (_routeProgress >= 0.35) {
+      return Icons.turn_left_rounded;
+    } else {
+      return Icons.turn_right_rounded;
+    }
+  }
+
   bool get upgradeOfferAvailable => _upgradeOfferAvailable;
   ParkingSlot? get upgradeCandidateSlot => _upgradeCandidateSlot;
   ReoptimizationEngine get engine => _engine;
@@ -343,8 +395,12 @@ class ParkingStateManager extends ChangeNotifier {
 
     _bookings.insert(0, newBooking);
     _currentActiveBooking = newBooking;
-    _etaMinutes = 12;
-    _distanceKm = 4.2;
+    _etaMinutes = _initialEtaMinutes;
+    _distanceKm = _initialDistanceKm;
+    _routeProgress = 0.0;
+    _hasTriggeredAutoUpgrade = false;
+    _hasArrivedAtDestination = false;
+    pauseMovementSimulation();
 
     _logEvent(
       bookingId: newBooking.id,
@@ -354,6 +410,74 @@ class ParkingStateManager extends ChangeNotifier {
 
     notifyListeners();
     return newBooking;
+  }
+
+  // In-Transit Route Movement Simulation (SYS-03)
+  void setRouteProgress(double progress) {
+    _routeProgress = progress.clamp(0.0, 1.0);
+    _distanceKm = double.parse((_initialDistanceKm * (1.0 - _routeProgress)).toStringAsFixed(1));
+    _etaMinutes = ((_initialEtaMinutes * (1.0 - _routeProgress)).ceil()).clamp(0, _initialEtaMinutes);
+
+    if (_routeProgress >= 1.0) {
+      _hasArrivedAtDestination = true;
+      pauseMovementSimulation();
+    } else {
+      _hasArrivedAtDestination = false;
+    }
+
+    // Dynamic upgrade trigger: check when ETA drops into trigger window (<= 10 min)
+    if (_etaMinutes <= 10 &&
+        !_hasTriggeredAutoUpgrade &&
+        _currentActiveBooking != null &&
+        _currentUser.preferences.allowUpgradeOffers) {
+      _hasTriggeredAutoUpgrade = true;
+      triggerUpgradeOfferCheck();
+    }
+
+    notifyListeners();
+  }
+
+  void tickSimulation({double step = 0.08}) {
+    final nextProgress = (_routeProgress + step).clamp(0.0, 1.0);
+    setRouteProgress(nextProgress);
+  }
+
+  void startMovementSimulation() {
+    if (_routeProgress >= 1.0) {
+      _routeProgress = 0.0;
+      _hasArrivedAtDestination = false;
+      _hasTriggeredAutoUpgrade = false;
+    }
+    _isSimulatingMovement = true;
+    _simulationTimer?.cancel();
+    _simulationTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) {
+      if (_routeProgress >= 1.0) {
+        timer.cancel();
+        _isSimulatingMovement = false;
+        _hasArrivedAtDestination = true;
+        notifyListeners();
+        return;
+      }
+      tickSimulation(step: 0.06);
+    });
+    notifyListeners();
+  }
+
+  void pauseMovementSimulation() {
+    _simulationTimer?.cancel();
+    _simulationTimer = null;
+    _isSimulatingMovement = false;
+    notifyListeners();
+  }
+
+  void resetMovementSimulation() {
+    pauseMovementSimulation();
+    _hasTriggeredAutoUpgrade = false;
+    _hasArrivedAtDestination = false;
+    _routeProgress = 0.0;
+    _distanceKm = _initialDistanceKm;
+    _etaMinutes = _initialEtaMinutes;
+    notifyListeners();
   }
 
   // Upgrade Offer Trigger (M7 / SYS-03)
@@ -537,12 +661,14 @@ class ParkingStateManager extends ChangeNotifier {
       description: 'Vehicle checked in at barrier for slot ${updated.slotId}',
     );
 
+    pauseMovementSimulation();
     notifyListeners();
   }
 
   // Cancel Booking (M6 / M8)
   void cancelBooking({bool autoCancelled = false}) {
     if (_currentActiveBooking == null) return;
+    pauseMovementSimulation();
 
     final booking = _currentActiveBooking!;
     final updated = booking.copyWith(
@@ -627,6 +753,7 @@ class ParkingStateManager extends ChangeNotifier {
       description: 'Paid LKR $finalAmount and exited parking',
     );
 
+    pauseMovementSimulation();
     notifyListeners();
   }
 
@@ -644,5 +771,11 @@ class ParkingStateManager extends ChangeNotifier {
       description: description,
     );
     _events.insert(0, event);
+  }
+
+  @override
+  void dispose() {
+    _simulationTimer?.cancel();
+    super.dispose();
   }
 }
