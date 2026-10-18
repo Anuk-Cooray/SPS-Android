@@ -6,6 +6,7 @@ import '../../data/models/booking_model.dart';
 import '../../data/models/parking_event_model.dart';
 import '../../data/services/parking_state_manager.dart';
 import 'engine_tuning_modal.dart';
+import 'telemetry_export_modal.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
@@ -36,11 +37,7 @@ class AdminDashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpace.xs),
                 OutlinedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Exported telemetry metrics (SYS-08) to CSV')),
-                    );
-                  },
+                  onPressed: () => TelemetryExportModal.show(context),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(70, 36),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
