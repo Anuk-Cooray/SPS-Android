@@ -1,8 +1,16 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/booking_model.dart';
 import '../models/parking_event_model.dart';
+
+class OtpVerificationResult {
+  final bool isValid;
+  final String? errorMessage;
+
+  const OtpVerificationResult({required this.isValid, this.errorMessage});
+}
 
 class FirestoreService {
   static final FirestoreService _instance = FirestoreService._internal();
@@ -11,6 +19,7 @@ class FirestoreService {
 
   FirebaseFirestore? _firestore;
   bool _isAvailable = false;
+  final Map<String, Map<String, dynamic>> _localVerifications = {};
 
   bool get isAvailable => _isAvailable;
 
@@ -24,7 +33,7 @@ class FirestoreService {
     }
   }
 
-  // --- Bookings Collection ---
+  // --- Collections ---
 
   CollectionReference<Map<String, dynamic>>? get _bookingsRef =>
       _isAvailable ? _firestore!.collection('bookings') : null;
@@ -34,6 +43,9 @@ class FirestoreService {
 
   CollectionReference<Map<String, dynamic>>? get _lotsRef =>
       _isAvailable ? _firestore!.collection('lots') : null;
+
+  CollectionReference<Map<String, dynamic>>? get _verificationsRef =>
+      _isAvailable ? _firestore!.collection('email_verifications') : null;
 
   /// Creates or overwrites a booking document in Firestore
   Future<void> saveBooking(Booking booking) async {
@@ -146,5 +158,120 @@ class FirestoreService {
       });
       return result;
     });
+  }
+
+  // --- Email OTP Verification Collection (M1) ---
+
+  /// Generates a real 6-digit OTP code, persists it to Firestore with a 5-minute expiry,
+  /// and stores it in the local memory cache for guaranteed offline reliability.
+  Future<String> sendEmailVerificationOtp(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final random = Random();
+    final code = (100000 + random.nextInt(900000)).toString();
+    final now = DateTime.now();
+    final expiresAt = now.add(const Duration(minutes: 5));
+
+    final data = <String, dynamic>{
+      'email': cleanEmail,
+      'otp': code,
+      'createdAt': now.toIso8601String(),
+      'expiresAt': expiresAt.toIso8601String(),
+      'isVerified': false,
+      'attempts': 0,
+    };
+
+    _localVerifications[cleanEmail] = data;
+
+    if (_isAvailable && _verificationsRef != null) {
+      // Persist in background with timeout so network delays never block the driver
+      _verificationsRef!
+          .doc(cleanEmail)
+          .set(data)
+          .timeout(const Duration(seconds: 2))
+          .catchError((e) {
+        debugPrint('[FirestoreService] Offline or sync error for OTP: $e');
+      });
+    }
+
+    return code;
+  }
+
+  /// Verifies the entered 6-digit code against Firestore / local cache.
+  /// Enforces expiration and a 5-attempt limit to prevent brute force attacks.
+  Future<OtpVerificationResult> verifyEmailOtp(String email, String enteredOtp) async {
+    final cleanEmail = email.trim().toLowerCase();
+    Map<String, dynamic>? record;
+
+    if (_isAvailable && _verificationsRef != null) {
+      try {
+        final doc = await _verificationsRef!
+            .doc(cleanEmail)
+            .get()
+            .timeout(const Duration(milliseconds: 1500));
+        if (doc.exists && doc.data() != null) {
+          record = doc.data();
+        }
+      } catch (e) {
+        debugPrint('[FirestoreService] Firestore get verification timeout, falling back to local: $e');
+      }
+    }
+
+    record ??= _localVerifications[cleanEmail];
+
+    if (record == null) {
+      return const OtpVerificationResult(
+        isValid: false,
+        errorMessage: 'No verification record found. Please request a new code.',
+      );
+    }
+
+    final expiresAtStr = record['expiresAt'] as String?;
+    final expiresAt = expiresAtStr != null ? DateTime.tryParse(expiresAtStr) : null;
+    if (expiresAt != null && DateTime.now().isAfter(expiresAt)) {
+      return const OtpVerificationResult(
+        isValid: false,
+        errorMessage: 'Verification code has expired. Please request a new code.',
+      );
+    }
+
+    final attempts = (record['attempts'] as int? ?? 0) + 1;
+    record['attempts'] = attempts;
+
+    if (attempts > 5) {
+      return const OtpVerificationResult(
+        isValid: false,
+        errorMessage: 'Too many incorrect attempts. Please request a fresh code.',
+      );
+    }
+
+    final expectedOtp = record['otp'] as String? ?? '';
+    if (expectedOtp != enteredOtp.trim()) {
+      if (_isAvailable && _verificationsRef != null) {
+        _verificationsRef!
+            .doc(cleanEmail)
+            .update({'attempts': attempts})
+            .timeout(const Duration(seconds: 2))
+            .catchError((_) {});
+      }
+      final remaining = 5 - attempts;
+      return OtpVerificationResult(
+        isValid: false,
+        errorMessage: 'Incorrect code. $remaining attempt${remaining == 1 ? '' : 's'} remaining.',
+      );
+    }
+
+    record['isVerified'] = true;
+    if (_isAvailable && _verificationsRef != null) {
+      _verificationsRef!
+          .doc(cleanEmail)
+          .update({
+            'isVerified': true,
+            'verifiedAt': DateTime.now().toIso8601String(),
+          })
+          .timeout(const Duration(seconds: 2))
+          .catchError((_) {});
+    }
+
+    return const OtpVerificationResult(isValid: true);
   }
 }

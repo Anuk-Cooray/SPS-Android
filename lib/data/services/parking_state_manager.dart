@@ -214,7 +214,37 @@ class ParkingStateManager extends ChangeNotifier {
     }
   }
 
-  // Auth & Profile
+  // Auth & Profile (M1)
+  String? _activeVerificationEmail;
+  String? _activeGeneratedOtp;
+  DateTime? _otpExpiresAt;
+
+  String? get activeVerificationEmail => _activeVerificationEmail;
+  String? get activeGeneratedOtp => _activeGeneratedOtp;
+  DateTime? get otpExpiresAt => _otpExpiresAt;
+
+  /// Requests a real 6-digit OTP code for the given email, persisted to Firestore
+  Future<String> sendVerificationOtp(String email) async {
+    final cleanEmail = email.trim();
+    _activeVerificationEmail = cleanEmail;
+    final otp = await _firestore.sendEmailVerificationOtp(cleanEmail);
+    _activeGeneratedOtp = otp;
+    _otpExpiresAt = DateTime.now().add(const Duration(minutes: 5));
+    debugPrint('[Auth] Generated 6-digit verification code for $cleanEmail');
+    notifyListeners();
+    return otp;
+  }
+
+  /// Verifies the entered OTP and logs the driver in on success
+  Future<OtpVerificationResult> verifyOtp(String email, String enteredOtp) async {
+    final result = await _firestore.verifyEmailOtp(email, enteredOtp);
+    if (result.isValid) {
+      await login(email);
+      debugPrint('[Auth] Email $email verified successfully');
+    }
+    return result;
+  }
+
   Future<void> login(String email) async {
     _isLoggedIn = true;
     if (email.toLowerCase() == 'anuk@example.com' || email.toLowerCase() == 'demo@example.com') {

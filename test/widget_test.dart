@@ -31,11 +31,23 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify first screen is LoginScreen
+    // Verify first screen is LoginScreen (Step 1)
     expect(find.text('Park smarter.\nBook in seconds.'), findsOneWidget);
-    expect(find.text('Verify & Continue'), findsOneWidget);
+    expect(find.text('Send Verification Code'), findsOneWidget);
 
-    // Tap Verify & Continue with prefilled demo credentials
+    // Tap Send Verification Code with prefilled demo credentials
+    await tester.tap(find.text('Send Verification Code'));
+    await tester.pumpAndSettle();
+
+    // Verify Step 2 is shown
+    expect(find.text('Verify your email'), findsOneWidget);
+    expect(find.text('Auto-fill code'), findsOneWidget);
+
+    // Tap Auto-fill code to fill the generated OTP
+    await tester.tap(find.text('Auto-fill code'));
+    await tester.pumpAndSettle();
+
+    // Tap Verify & Continue
     await tester.tap(find.text('Verify & Continue'));
     await tester.pump();
     await tester.pumpAndSettle();
@@ -60,6 +72,17 @@ void main() {
 
     // Tap "Test New User"
     await tester.tap(find.text('Test New User'));
+    await tester.pumpAndSettle();
+
+    // Tap Send Verification Code
+    await tester.tap(find.text('Send Verification Code'));
+    await tester.pumpAndSettle();
+
+    // Verify Step 2 is shown
+    expect(find.text('Verify your email'), findsOneWidget);
+
+    // Tap Auto-fill code
+    await tester.tap(find.text('Auto-fill code'));
     await tester.pumpAndSettle();
 
     // Tap Verify & Continue
@@ -176,5 +199,45 @@ void main() {
     expect(manager.routeProgress, greaterThan(0.0));
 
     manager.dispose();
+  });
+
+  testWidgets('Email verification flow: invalid code shows error and Change Email returns to Step 1',
+      (WidgetTester tester) async {
+    setPhoneSize(tester);
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => ParkingStateManager(),
+        child: const SmartParkingApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // 1. Enter custom email
+    await tester.enterText(find.byType(TextField).first, 'student@sliit.lk');
+    await tester.tap(find.text('Send Verification Code'));
+    await tester.pumpAndSettle();
+
+    // 2. On Step 2, enter wrong code
+    expect(find.text('Verify your email'), findsOneWidget);
+    expect(find.textContaining('student@sliit.lk'), findsOneWidget);
+
+    // Enter incorrect digit in first box
+    await tester.enterText(find.byType(TextField).first, '0');
+    await tester.tap(find.text('Verify & Continue'));
+    await tester.pumpAndSettle();
+
+    // Shows validation error for incomplete/incorrect OTP
+    expect(find.text('Please enter the complete 6-digit verification code'), findsOneWidget);
+
+    // 3. Tap Change Email to go back to Step 1
+    await tester.tap(find.text('Change Email'));
+    await tester.pumpAndSettle();
+
+    // Back on Step 1
+    expect(find.text('Park smarter.\nBook in seconds.'), findsOneWidget);
+    expect(find.text('Send Verification Code'), findsOneWidget);
   });
 }
