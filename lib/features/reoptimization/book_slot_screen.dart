@@ -6,6 +6,7 @@ import '../../core/widgets/app_buttons.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/models/parking_lot_model.dart';
 import '../../data/models/parking_slot_model.dart';
+import '../../data/models/vehicle_model.dart';
 import '../../data/services/parking_state_manager.dart';
 import 'engine/slot_score_result.dart';
 
@@ -37,11 +38,24 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
     final state = context.read<ParkingStateManager>();
     final recommended = state.getRecommendedSlot(widget.lot);
 
-    _recommendedSlot = recommended ??
-        widget.lot.slots.firstWhere(
-          (s) => s.isAvailable,
-          orElse: () => widget.lot.slots.first,
-        );
+    final availableSlots = widget.lot.slots.where((s) => s.isAvailable).toList();
+    if (recommended != null) {
+      _recommendedSlot = recommended;
+    } else if (availableSlots.isNotEmpty) {
+      _recommendedSlot = availableSlots.first;
+    } else if (widget.lot.slots.isNotEmpty) {
+      _recommendedSlot = widget.lot.slots.first;
+    } else {
+      _recommendedSlot = ParkingSlot(
+        id: 'None',
+        lotId: widget.lot.id,
+        row: 'A',
+        number: 0,
+        state: SlotState.taken,
+        size: VehicleSize.medium,
+        walkingDistanceMeters: widget.lot.distanceMeters,
+      );
+    }
 
     _selectedSlot = _recommendedSlot;
     _recommendedScore = state.getRecommendedSlotScore(widget.lot);
@@ -261,6 +275,14 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
   }
 
   void _confirmReservation() {
+    if (!_selectedSlot.isAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Slot ${_selectedSlot.id} is not available for reservation.'),
+        ),
+      );
+      return;
+    }
     final state = context.read<ParkingStateManager>();
     final booking = state.reserveSlot(
       lot: widget.lot,
@@ -442,8 +464,10 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                         const SizedBox(height: AppSpace.lg),
 
                         // Legend
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          spacing: 8,
+                          runSpacing: 6,
                           children: [
                             _LegendItem(label: 'Free', border: Border.all(color: c.slotFreeBorder, width: 1.2)),
                             _LegendItem(label: 'Taken', fill: c.slotTaken),
@@ -525,10 +549,14 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                           const SizedBox(height: AppSpace.sm),
                           const Divider(height: 1),
                           const SizedBox(height: AppSpace.xs),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 6,
                             children: [
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   _buildScorePill(
                                     'Dist: ${_recommendedScore!.distanceScore.toInt()}%',
@@ -721,8 +749,14 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                   const SizedBox(height: AppSpace.md),
 
                   PrimaryButton(
-                    text: 'Reserve ${_selectedSlot.id}',
-                    onPressed: _confirmReservation,
+                    text: widget.lot.isFull
+                        ? 'Lot is Full'
+                        : (_selectedSlot.isAvailable
+                            ? 'Reserve ${_selectedSlot.id}'
+                            : 'Slot Unavailable'),
+                    onPressed: (widget.lot.isFull || !_selectedSlot.isAvailable)
+                        ? null
+                        : _confirmReservation,
                   ),
 
                   const SizedBox(height: AppSpace.sm),
@@ -856,22 +890,33 @@ class _DashedLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final dashCount = (constraints.constrainWidth() / 8).floor();
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(dashCount, (_) {
-            return SizedBox(
-              width: 4,
-              height: 1,
-              child: DecoratedBox(decoration: BoxDecoration(color: color)),
-            );
-          }),
-        );
-      },
+    return SizedBox(
+      height: 1,
+      child: CustomPaint(
+        painter: _DashedLinePainter(color: color),
+      ),
     );
   }
+}
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  _DashedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.0;
+    double startX = 0;
+    while (startX < size.width) {
+      canvas.drawLine(Offset(startX, 0), Offset(startX + 4, 0), paint);
+      startX += 8;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedLinePainter oldDelegate) => oldDelegate.color != color;
 }
 
 class _DiagonalStripes extends StatelessWidget {
