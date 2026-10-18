@@ -20,7 +20,7 @@ class ParkingStateManager extends ChangeNotifier {
   bool _isLoggedIn = false;
   bool _isInitialized = false;
   final List<ParkingLot> _lots = MockData.getInitialLots();
-  final List<Booking> _bookings = MockData.getInitialBookings();
+  final List<Booking> _bookings = [];
   final List<ParkingEvent> _events = [];
 
   // Mathematical scoring engine & re-optimization (SYS-01, SYS-03)
@@ -42,8 +42,6 @@ class ParkingStateManager extends ChangeNotifier {
   ParkingSlot? _upgradeCandidateSlot;
 
   ParkingStateManager() {
-    _refreshActiveBooking();
-    _initializeMockEvents();
     _initSession();
   }
 
@@ -52,6 +50,8 @@ class ParkingStateManager extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final loggedIn = prefs.getBool('sp_is_logged_in') ?? false;
       final userJson = prefs.getString('sp_user_profile');
+      final bookingsJson = prefs.getString('sp_bookings');
+      final eventsJson = prefs.getString('sp_events');
 
       if (loggedIn && userJson != null) {
         final decoded = jsonDecode(userJson) as Map<String, dynamic>;
@@ -60,6 +60,24 @@ class ParkingStateManager extends ChangeNotifier {
       } else {
         _isLoggedIn = false;
       }
+
+      if (bookingsJson != null && bookingsJson.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(bookingsJson) as List<dynamic>;
+        _bookings.clear();
+        _bookings.addAll(list.map((m) => Booking.fromJson(m as Map<String, dynamic>)));
+      } else {
+        _bookings.clear();
+      }
+
+      if (eventsJson != null && eventsJson.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(eventsJson) as List<dynamic>;
+        _events.clear();
+        _events.addAll(list.map((m) => ParkingEvent.fromJson(m as Map<String, dynamic>)));
+      } else {
+        _events.clear();
+      }
+
+      _refreshActiveBooking();
     } catch (_) {
       _isLoggedIn = false;
     } finally {
@@ -78,45 +96,26 @@ class ParkingStateManager extends ChangeNotifier {
     } catch (_) {}
   }
 
-  void _initializeMockEvents() {
-    final now = DateTime.now();
-    _events.addAll([
-      ParkingEvent(
-        id: 'EV-1005',
-        bookingId: 'BK-2041',
-        type: ParkingEventType.booked,
-        timestamp: now.subtract(const Duration(minutes: 8)),
-        description: 'Multi-criteria recommendation allocated slot A-03 (Score: 88.5)',
-      ),
-      ParkingEvent(
-        id: 'EV-1004',
-        bookingId: 'BK-2035',
-        type: ParkingEventType.checkedIn,
-        timestamp: now.subtract(const Duration(minutes: 38)),
-        description: 'Vehicle NB-5532 verified and barrier raised for slot B-04',
-      ),
-      ParkingEvent(
-        id: 'EV-1003',
-        bookingId: 'BK-1980',
-        type: ParkingEventType.accepted,
-        timestamp: now.subtract(const Duration(hours: 3)),
-        description: 'Accepted upgrade to C-11: Saved 80m walking (Score improved +25.0%)',
-      ),
-      ParkingEvent(
-        id: 'EV-1002',
-        bookingId: 'BK-1980',
-        type: ParkingEventType.offered,
-        timestamp: now.subtract(const Duration(hours: 3, minutes: 1)),
-        description: 'Found superior slot C-11 in New Building P2 (ETA: 8 min)',
-      ),
-      ParkingEvent(
-        id: 'EV-1001',
-        bookingId: 'BK-1950',
-        type: ParkingEventType.autoCancelled,
-        timestamp: now.subtract(const Duration(days: 6)),
-        description: 'Auto-cancelled after 15 min grace window expired without check-in',
-      ),
-    ]);
+  Future<void> _persistBookings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'sp_bookings',
+        jsonEncode(_bookings.map((b) => b.toJson()).toList()),
+      );
+      await prefs.setString(
+        'sp_events',
+        jsonEncode(_events.map((e) => e.toJson()).toList()),
+      );
+    } catch (_) {}
+  }
+
+  void clearAllBookings() {
+    _bookings.clear();
+    _currentActiveBooking = null;
+    _events.clear();
+    _persistBookings();
+    notifyListeners();
   }
 
   // Getters
@@ -185,22 +184,27 @@ class ParkingStateManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Active bookings list
+  // Driver-specific active & history bookings
   List<Booking> get activeBookings =>
-      _bookings.where((b) => b.isActive).toList();
+      _bookings.where((b) => b.userId == _currentUser.id && b.isActive).toList();
 
   List<Booking> get upcomingBookings =>
-      _bookings.where((b) => b.status == BookingStatus.reserved).toList();
+      _bookings.where((b) => b.userId == _currentUser.id && b.status == BookingStatus.reserved).toList();
 
   List<Booking> get historyBookings => _bookings
       .where((b) =>
-          b.status == BookingStatus.completed ||
-          b.status == BookingStatus.cancelled ||
-          b.status == BookingStatus.autoCancelled)
+          b.userId == _currentUser.id &&
+          (b.status == BookingStatus.completed ||
+              b.status == BookingStatus.cancelled ||
+              b.status == BookingStatus.autoCancelled))
       .toList();
 
+  // Admin visibility (all campus reservations across users)
+  List<Booking> get allBookings => _bookings;
+  List<Booking> get allActiveBookings => _bookings.where((b) => b.isActive).toList();
+
   void _refreshActiveBooking() {
-    final active = _bookings.where((b) => b.isActive).toList();
+    final active = _bookings.where((b) => b.userId == _currentUser.id && b.isActive).toList();
     if (active.isNotEmpty) {
       _currentActiveBooking = active.first;
     } else {
@@ -771,6 +775,7 @@ class ParkingStateManager extends ChangeNotifier {
       description: description,
     );
     _events.insert(0, event);
+    _persistBookings();
   }
 
   @override

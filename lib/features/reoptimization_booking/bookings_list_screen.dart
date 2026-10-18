@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/services/parking_state_manager.dart';
+import 'booking_detail_modal.dart';
 
 class BookingsListScreen extends StatefulWidget {
   final ValueChanged<Booking>? onOpenActiveBooking;
@@ -69,25 +70,50 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
                   children: [
                     if (_selectedTabIndex == 0) ...[
                       if (activeList.isEmpty)
-                        _buildEmptyState('No active booking right now')
+                        _buildEmptyState(
+                          'No active booking right now',
+                          'Select a lot on the campus map to reserve a parking bay and start live guidance.',
+                        )
                       else
                         ...activeList.map((booking) => _ActiveBookingCard(
                               booking: booking,
-                              onTap: () => widget.onOpenActiveBooking?.call(booking),
+                              onTap: () => BookingDetailModal.show(
+                                context: context,
+                                booking: booking,
+                                onOpenNavigation: () => widget.onOpenActiveBooking?.call(booking),
+                              ),
                             )),
                     ] else if (_selectedTabIndex == 1) ...[
                       if (upcomingList.isEmpty)
-                        _buildEmptyState('No upcoming bookings')
+                        _buildEmptyState(
+                          'No upcoming bookings',
+                          'Advance reservations will appear here with arrival countdowns.',
+                        )
                       else
-                        ...upcomingList.map((booking) => _SimpleBookingCard(booking: booking)),
+                        ...upcomingList.map((booking) => _SimpleBookingCard(
+                              booking: booking,
+                              onTap: () => BookingDetailModal.show(
+                                context: context,
+                                booking: booking,
+                              ),
+                            )),
                     ] else ...[
                       if (historyList.isEmpty)
-                        _buildEmptyState('No previous bookings found')
+                        _buildEmptyState(
+                          'No previous bookings found',
+                          'Completed and cancelled parking sessions will be stored in your history.',
+                        )
                       else
-                        ...historyList.map((booking) => _SimpleBookingCard(booking: booking)),
+                        ...historyList.map((booking) => _SimpleBookingCard(
+                              booking: booking,
+                              onTap: () => BookingDetailModal.show(
+                                context: context,
+                                booking: booking,
+                              ),
+                            )),
                     ],
 
-                    // Earlier section (history preview on Active tab as in mockup)
+                    // Earlier section (history preview on Active tab if history exists)
                     if (_selectedTabIndex == 0 && historyList.isNotEmpty) ...[
                       const SizedBox(height: AppSpace.lg),
                       Text(
@@ -95,7 +121,13 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
                         style: AppText.overline.copyWith(color: c.textSecondary),
                       ),
                       const SizedBox(height: AppSpace.sm),
-                      ...historyList.take(2).map((b) => _SimpleBookingCard(booking: b)),
+                      ...historyList.take(2).map((b) => _SimpleBookingCard(
+                            booking: b,
+                            onTap: () => BookingDetailModal.show(
+                              context: context,
+                              booking: b,
+                            ),
+                          )),
                     ]
                   ],
                 ),
@@ -141,15 +173,35 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
     );
   }
 
-  Widget _buildEmptyState(String message) {
+  Widget _buildEmptyState(String title, String subtitle) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40),
-      child: Center(
-        child: Text(
-          message,
-          style: AppText.body.copyWith(color: c.textSecondary),
-        ),
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: AppSpace.md),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: c.surfaceMuted,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.local_parking_rounded, color: c.textSecondary, size: 28),
+          ),
+          const SizedBox(height: AppSpace.md),
+          Text(
+            title,
+            style: AppText.title.copyWith(color: c.textPrimary, fontWeight: FontWeight.w700),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: AppText.caption.copyWith(color: c.textSecondary),
+          ),
+        ],
       ),
     );
   }
@@ -212,11 +264,11 @@ class _ActiveBookingCard extends StatelessWidget {
             const Divider(),
             const SizedBox(height: AppSpace.md),
 
-            // Timeline Items
+            // Dynamic Timeline Items
             _TimelineItem(
               dotColor: c.textPrimary,
               title: 'Booked ${booking.originalSlotId ?? booking.slotId}',
-              time: '9:58 AM',
+              time: DateFormat('h:mm a').format(booking.bookedAt),
             ),
             const SizedBox(height: AppSpace.sm),
 
@@ -224,7 +276,7 @@ class _ActiveBookingCard extends StatelessWidget {
               _TimelineItem(
                 dotColor: c.accent,
                 title: 'Upgraded to ${booking.slotId} · saved ${booking.distanceSavedMeters} m',
-                time: '10:14 AM',
+                time: DateFormat('h:mm a').format(booking.bookedAt.add(const Duration(minutes: 5))),
               ),
               const SizedBox(height: AppSpace.sm),
             ],
@@ -232,8 +284,10 @@ class _ActiveBookingCard extends StatelessWidget {
             _TimelineItem(
               dotColor: Colors.transparent,
               borderColor: c.textSecondary,
-              title: 'Check in',
-              time: 'by ${DateFormat('h:mm a').format(booking.cancelDeadline)}',
+              title: booking.checkedInAt != null ? 'Checked in at barrier' : 'Check in',
+              time: booking.checkedInAt != null
+                  ? DateFormat('h:mm a').format(booking.checkedInAt!)
+                  : 'by ${DateFormat('h:mm a').format(booking.cancelDeadline)}',
               isLast: true,
             ),
           ],
@@ -296,8 +350,9 @@ class _TimelineItem extends StatelessWidget {
 
 class _SimpleBookingCard extends StatelessWidget {
   final Booking booking;
+  final VoidCallback? onTap;
 
-  const _SimpleBookingCard({required this.booking});
+  const _SimpleBookingCard({required this.booking, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -305,59 +360,63 @@ class _SimpleBookingCard extends StatelessWidget {
     final isCancelled = booking.status == BookingStatus.cancelled ||
         booking.status == BookingStatus.autoCancelled;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpace.sm),
-      padding: const EdgeInsets.all(AppSpace.md),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: c.border),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${booking.lotName} · ${booking.slotId}',
-                  style: AppText.title.copyWith(color: c.textPrimary),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isCancelled
-                      ? 'Auto-cancelled, arrived late'
-                      : 'Completed session · ${booking.durationHours} h',
-                  style: AppText.caption.copyWith(color: c.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          if (isCancelled)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: c.surfaceMuted,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'Cancelled',
-                style: AppText.caption.copyWith(
-                  color: c.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            )
-          else
-            Text(
-              'LKR ${booking.finalFee > 0 ? booking.finalFee : booking.estimatedFee}',
-              style: AppText.title.copyWith(
-                color: c.textPrimary,
-                fontWeight: FontWeight.w700,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpace.sm),
+        padding: const EdgeInsets.all(AppSpace.md),
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: c.border),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${booking.lotName} · Bay ${booking.slotId}',
+                    style: AppText.title.copyWith(color: c.textPrimary),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isCancelled
+                        ? 'Auto-cancelled · Expired grace window'
+                        : 'Completed session · ${booking.durationHours} h · ${DateFormat('d MMM, h:mm a').format(booking.bookedAt)}',
+                    style: AppText.caption.copyWith(color: c.textSecondary),
+                  ),
+                ],
               ),
             ),
-        ],
+            if (isCancelled)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: c.surfaceMuted,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Cancelled',
+                  style: AppText.caption.copyWith(
+                    color: c.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            else
+              Text(
+                'LKR ${booking.finalFee > 0 ? booking.finalFee : booking.estimatedFee}',
+                style: AppText.title.copyWith(
+                  color: c.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

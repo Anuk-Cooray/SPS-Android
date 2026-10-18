@@ -78,7 +78,7 @@ class AdminDashboardScreen extends StatelessWidget {
               _buildStatCard(
                 context,
                 title: 'Active bookings',
-                value: '${state.activeBookings.length}',
+                value: '${state.allActiveBookings.length}',
                 subtitle: 'arriving in 15 min',
               ),
               // Card 3: Upgrades accepted (Blue highlighted)

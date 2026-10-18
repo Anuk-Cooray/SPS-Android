@@ -286,6 +286,14 @@ void main() {
     setUp(() {
       SharedPreferences.setMockInitialValues({});
       stateManager = ParkingStateManager();
+      final lot = stateManager.lots.first;
+      final slot = lot.slots.firstWhere((s) => s.state == SlotState.free);
+      stateManager.reserveSlot(
+        lot: lot,
+        slot: slot,
+        arrivalTime: DateTime.now().add(const Duration(minutes: 12)),
+        durationHours: 2,
+      );
     });
 
     tearDown(() {

@@ -113,4 +113,55 @@ class Booking {
       completedAt: completedAt ?? this.completedAt,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'userId': userId,
+        'vehicleId': vehicleId,
+        'vehiclePlate': vehiclePlate,
+        'lotId': lotId,
+        'lotName': lotName,
+        'slotId': slotId,
+        'bookedAt': bookedAt.toIso8601String(),
+        'arrivalTime': arrivalTime.toIso8601String(),
+        'durationHours': durationHours,
+        'status': status.name,
+        'originalSlotId': originalSlotId,
+        'distanceSavedMeters': distanceSavedMeters,
+        'estimatedFee': estimatedFee,
+        'extensionFee': extensionFee,
+        'finalFee': finalFee,
+        'qrToken': qrToken,
+        'checkedInAt': checkedInAt?.toIso8601String(),
+        'completedAt': completedAt?.toIso8601String(),
+      };
+
+  factory Booking.fromJson(Map<String, dynamic> json) => Booking(
+        id: json['id'] as String,
+        userId: json['userId'] as String? ?? 'user-001',
+        vehicleId: json['vehicleId'] as String? ?? 'v-default',
+        vehiclePlate: json['vehiclePlate'] as String? ?? 'CAB-4821',
+        lotId: json['lotId'] as String,
+        lotName: json['lotName'] as String,
+        slotId: json['slotId'] as String,
+        bookedAt: DateTime.tryParse(json['bookedAt'] as String? ?? '') ?? DateTime.now(),
+        arrivalTime: DateTime.tryParse(json['arrivalTime'] as String? ?? '') ?? DateTime.now(),
+        durationHours: json['durationHours'] as int? ?? 1,
+        status: BookingStatus.values.firstWhere(
+          (s) => s.name == json['status'],
+          orElse: () => BookingStatus.reserved,
+        ),
+        originalSlotId: json['originalSlotId'] as String?,
+        distanceSavedMeters: json['distanceSavedMeters'] as int? ?? 0,
+        estimatedFee: json['estimatedFee'] as int? ?? 0,
+        extensionFee: json['extensionFee'] as int? ?? 0,
+        finalFee: json['finalFee'] as int? ?? 0,
+        qrToken: json['qrToken'] as String? ?? '',
+        checkedInAt: json['checkedInAt'] != null
+            ? DateTime.tryParse(json['checkedInAt'] as String)
+            : null,
+        completedAt: json['completedAt'] != null
+            ? DateTime.tryParse(json['completedAt'] as String)
+            : null,
+      );
 }
