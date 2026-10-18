@@ -7,6 +7,7 @@ import '../../data/models/booking_model.dart';
 import '../../data/models/parking_lot_model.dart';
 import '../../data/models/parking_slot_model.dart';
 import '../../data/services/parking_state_manager.dart';
+import 'engine/slot_score_result.dart';
 
 class BookSlotScreen extends StatefulWidget {
   final ParkingLot lot;
@@ -25,6 +26,8 @@ class BookSlotScreen extends StatefulWidget {
 class _BookSlotScreenState extends State<BookSlotScreen> {
   late ParkingSlot _selectedSlot;
   late ParkingSlot _recommendedSlot;
+  SlotScoreResult? _recommendedScore;
+  SlotScoreResult? _selectedScore;
   DateTime _arrivalTime = DateTime.now().add(const Duration(minutes: 15));
   int _durationHours = 2;
 
@@ -41,6 +44,8 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
         );
 
     _selectedSlot = _recommendedSlot;
+    _recommendedScore = state.getRecommendedSlotScore(widget.lot);
+    _selectedScore = state.scoreSlot(widget.lot, _selectedSlot);
   }
 
   void _selectTime() async {
@@ -89,6 +94,167 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
               }),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showAlgorithmExplanation(BuildContext context) {
+    final c = context.colors;
+    final state = context.read<ParkingStateManager>();
+    final weights = state.scoringWeights;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: AppRadius.sheetR,
+        ),
+        padding: const EdgeInsets.all(AppSpace.lg),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpace.md),
+                  decoration: BoxDecoration(
+                    color: c.slotTaken,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Icon(Icons.calculate_outlined, color: c.accent, size: 24),
+                  const SizedBox(width: AppSpace.sm),
+                  Expanded(
+                    child: Text(
+                      'Multi-Criteria Optimization Model (SYS-01)',
+                      style: AppText.h2.copyWith(color: c.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.xs),
+              Text(
+                'Objective function maximizes driver utility while balancing lot throughput and preserving large-vehicle capacity.',
+                style: AppText.caption.copyWith(color: c.textSecondary),
+              ),
+              const SizedBox(height: AppSpace.md),
+
+              // Mathematical Formulation Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpace.md),
+                decoration: BoxDecoration(
+                  color: c.accentSoft,
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  border: Border.all(color: c.accent.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Objective Scoring Function:',
+                      style: AppText.label.copyWith(color: c.accent, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'S(s) = wd·Sdist(s) + wz·Ssize(s) + wp·Spref(s) - wu·Pdemand(s)',
+                      style: AppText.body.copyWith(
+                        color: c.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppSpace.md),
+              Text('Current Parameter Weights', style: AppText.title.copyWith(color: c.textPrimary)),
+              const SizedBox(height: AppSpace.sm),
+              _weightRow('Distance weight (wd)', '${(weights.distanceWeight * 100).toInt()}%', c),
+              _weightRow('Size fit weight (wz)', '${(weights.sizeFitWeight * 100).toInt()}%', c),
+              _weightRow('Preference weight (wp)', '${(weights.preferenceWeight * 100).toInt()}%', c),
+              _weightRow('Demand penalty (wu)', '${(weights.demandWeight * 100).toInt()}%', c),
+
+              const SizedBox(height: AppSpace.md),
+              Text('Evaluated Breakdown for ${_recommendedSlot.id}', style: AppText.title.copyWith(color: c.textPrimary)),
+              const SizedBox(height: AppSpace.sm),
+              if (_recommendedScore != null) ...[
+                _scoreRow('Walking distance score', '${_recommendedScore!.distanceScore.toStringAsFixed(1)} / 100', c),
+                _scoreRow('Size compatibility score', '${_recommendedScore!.sizeFitScore.toStringAsFixed(1)} / 100', c),
+                _scoreRow('Driver preference score', '${_recommendedScore!.preferenceScore.toStringAsFixed(1)} / 100', c),
+                _scoreRow('Lot congestion penalty', '-${_recommendedScore!.demandPenalty.toStringAsFixed(1)}', c),
+                const Divider(),
+                _scoreRow(
+                  'Final Composite Score',
+                  '${_recommendedScore!.totalScore.toStringAsFixed(1)} / 100.0',
+                  c,
+                  isBold: true,
+                ),
+              ],
+
+              const SizedBox(height: AppSpace.lg),
+              PrimaryButton(
+                text: 'Done',
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _weightRow(String label, String value, AppColors c) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppText.caption.copyWith(color: c.textSecondary)),
+          Text(value, style: AppText.caption.copyWith(color: c.textPrimary, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _scoreRow(String label, String value, AppColors c, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppText.body.copyWith(color: isBold ? c.textPrimary : c.textSecondary, fontWeight: isBold ? FontWeight.w700 : FontWeight.normal)),
+          Text(value, style: AppText.body.copyWith(color: isBold ? c.accent : c.textPrimary, fontWeight: isBold ? FontWeight.w700 : FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScorePill(String text, AppColors c) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: c.border),
+      ),
+      child: Text(
+        text,
+        style: AppText.caption.copyWith(
+          color: c.textSecondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -205,7 +371,11 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                               isSelected: slot.id == _selectedSlot.id,
                               onTap: () {
                                 if (slot.isAvailable) {
-                                  setState(() => _selectedSlot = slot);
+                                  final state = context.read<ParkingStateManager>();
+                                  setState(() {
+                                    _selectedSlot = slot;
+                                    _selectedScore = state.scoreSlot(widget.lot, slot);
+                                  });
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -251,7 +421,11 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                               isSelected: slot.id == _selectedSlot.id,
                               onTap: () {
                                 if (slot.isAvailable) {
-                                  setState(() => _selectedSlot = slot);
+                                  final state = context.read<ParkingStateManager>();
+                                  setState(() {
+                                    _selectedSlot = slot;
+                                    _selectedScore = state.scoreSlot(widget.lot, slot);
+                                  });
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -283,7 +457,7 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
 
                   const SizedBox(height: AppSpace.md),
 
-                  // 2. AI Recommendation Card
+                  // 2. Mathematical Scoring & Recommendation Card (SYS-01)
                   Container(
                     padding: const EdgeInsets.all(AppSpace.md),
                     decoration: BoxDecoration(
@@ -291,33 +465,150 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                       borderRadius: BorderRadius.circular(AppRadius.card),
                       border: Border.all(color: c.border),
                     ),
-                    child: Row(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.auto_awesome_rounded, color: c.accent, size: 22),
-                        const SizedBox(width: AppSpace.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Recommended: ${_recommendedSlot.id}',
-                                style: AppText.title.copyWith(
-                                  color: c.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.auto_awesome_rounded, color: c.accent, size: 22),
+                            const SizedBox(width: AppSpace.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Recommended: ${_recommendedSlot.id}',
+                                        style: AppText.title.copyWith(
+                                          color: c.textPrimary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      if (_recommendedScore != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: c.accentSoft,
+                                            borderRadius: BorderRadius.circular(AppRadius.chip),
+                                          ),
+                                          child: Text(
+                                            'Score ${_recommendedScore!.totalScore.toStringAsFixed(1)}',
+                                            style: AppText.caption.copyWith(
+                                              color: c.accent,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Closest free slot to entrance · ${_recommendedSlot.walkingDistanceMeters} m walk · fits ${_recommendedSlot.size.displayName}',
+                                    style: AppText.body.copyWith(
+                                      color: c.textSecondary,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Closest free slot to the entrance · ${_recommendedSlot.walkingDistanceMeters} m walk · fits your sedan',
-                                style: AppText.body.copyWith(
-                                  color: c.textSecondary,
-                                  fontSize: 13,
+                            ),
+                          ],
+                        ),
+
+                        if (_recommendedScore != null) ...[
+                          const SizedBox(height: AppSpace.sm),
+                          const Divider(height: 1),
+                          const SizedBox(height: AppSpace.xs),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  _buildScorePill(
+                                    'Dist: ${_recommendedScore!.distanceScore.toInt()}%',
+                                    c,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  _buildScorePill(
+                                    'Fit: ${_recommendedScore!.sizeFitScore.toInt()}%',
+                                    c,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  _buildScorePill(
+                                    'Pref: +${_recommendedScore!.preferenceScore.toInt()}',
+                                    c,
+                                  ),
+                                ],
+                              ),
+                              InkWell(
+                                onTap: () => _showAlgorithmExplanation(context),
+                                borderRadius: BorderRadius.circular(4),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'SYS-01 Model',
+                                        style: AppText.caption.copyWith(
+                                          color: c.accent,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Icon(Icons.chevron_right_rounded, size: 14, color: c.accent),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
+                        ],
+
+                        // Comparison warning if user picked another slot
+                        if (_selectedSlot.id != _recommendedSlot.id) ...[
+                          const SizedBox(height: AppSpace.sm),
+                          Container(
+                            padding: const EdgeInsets.all(AppSpace.sm),
+                            decoration: BoxDecoration(
+                              color: c.accentSoft.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(AppRadius.cardSm),
+                              border: Border.all(color: c.accent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded, size: 18, color: c.accent),
+                                const SizedBox(width: AppSpace.xs),
+                                Expanded(
+                                  child: Text(
+                                    'Custom pick: ${_selectedSlot.id} (${_selectedSlot.walkingDistanceMeters}m, score: ${_selectedScore?.totalScore.toStringAsFixed(1) ?? "--"}). Recommended ${_recommendedSlot.id} saves ${(_selectedSlot.walkingDistanceMeters - _recommendedSlot.walkingDistanceMeters).clamp(0, 500)}m.',
+                                    style: AppText.caption.copyWith(color: c.textPrimary, fontSize: 11),
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedSlot = _recommendedSlot;
+                                      _selectedScore = _recommendedScore;
+                                    });
+                                  },
+                                  child: Text(
+                                    'Revert',
+                                    style: AppText.caption.copyWith(
+                                      color: c.accent,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

@@ -1,5 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../../core/theme/app_theme.dart';
+import '../../features/reoptimization/engine/reoptimization_engine.dart';
+import '../../features/reoptimization/engine/scoring_weights.dart';
+import '../../features/reoptimization/engine/slot_score_result.dart';
+import '../../features/reoptimization/engine/upgrade_evaluation_result.dart';
 import '../models/booking_model.dart';
 import '../models/parking_event_model.dart';
 import '../models/parking_lot_model.dart';
@@ -15,6 +19,10 @@ class ParkingStateManager extends ChangeNotifier {
   final List<Booking> _bookings = MockData.getInitialBookings();
   final List<ParkingEvent> _events = [];
 
+  // Mathematical scoring engine & re-optimization (SYS-01, SYS-03)
+  final ReoptimizationEngine _engine = ReoptimizationEngine();
+  UpgradeEvaluationResult? _lastUpgradeEvaluation;
+
   // Active navigation / in-transit state
   Booking? _currentActiveBooking;
   int _etaMinutes = 12;
@@ -24,6 +32,48 @@ class ParkingStateManager extends ChangeNotifier {
 
   ParkingStateManager() {
     _refreshActiveBooking();
+    _initializeMockEvents();
+  }
+
+  void _initializeMockEvents() {
+    final now = DateTime.now();
+    _events.addAll([
+      ParkingEvent(
+        id: 'EV-1005',
+        bookingId: 'BK-2041',
+        type: ParkingEventType.booked,
+        timestamp: now.subtract(const Duration(minutes: 8)),
+        description: 'Multi-criteria recommendation allocated slot A-03 (Score: 88.5)',
+      ),
+      ParkingEvent(
+        id: 'EV-1004',
+        bookingId: 'BK-2035',
+        type: ParkingEventType.checkedIn,
+        timestamp: now.subtract(const Duration(minutes: 38)),
+        description: 'Vehicle NB-5532 verified and barrier raised for slot B-04',
+      ),
+      ParkingEvent(
+        id: 'EV-1003',
+        bookingId: 'BK-1980',
+        type: ParkingEventType.accepted,
+        timestamp: now.subtract(const Duration(hours: 3)),
+        description: 'Accepted upgrade to C-11: Saved 80m walking (Score improved +25.0%)',
+      ),
+      ParkingEvent(
+        id: 'EV-1002',
+        bookingId: 'BK-1980',
+        type: ParkingEventType.offered,
+        timestamp: now.subtract(const Duration(hours: 3, minutes: 1)),
+        description: 'Found superior slot C-11 in New Building P2 (ETA: 8 min)',
+      ),
+      ParkingEvent(
+        id: 'EV-1001',
+        bookingId: 'BK-1950',
+        type: ParkingEventType.autoCancelled,
+        timestamp: now.subtract(const Duration(days: 6)),
+        description: 'Auto-cancelled after 15 min grace window expired without check-in',
+      ),
+    ]);
   }
 
   // Getters
@@ -37,6 +87,14 @@ class ParkingStateManager extends ChangeNotifier {
   double get distanceKm => _distanceKm;
   bool get upgradeOfferAvailable => _upgradeOfferAvailable;
   ParkingSlot? get upgradeCandidateSlot => _upgradeCandidateSlot;
+  ReoptimizationEngine get engine => _engine;
+  ScoringWeights get scoringWeights => _engine.weights;
+  UpgradeEvaluationResult? get lastUpgradeEvaluation => _lastUpgradeEvaluation;
+
+  void updateScoringWeights(ScoringWeights newWeights) {
+    _engine.weights = newWeights;
+    notifyListeners();
+  }
 
   // Active bookings list
   List<Booking> get activeBookings =>
@@ -98,38 +156,76 @@ class ParkingStateManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  // AI Slot Scoring & Recommendation (SYS-01)
+  // Mathematical Slot Scoring & Multi-Criteria Recommendation (SYS-01)
   ParkingSlot? getRecommendedSlot(ParkingLot lot) {
-    final availableSlots = lot.slots.where((s) => s.isAvailable).toList();
-    if (availableSlots.isEmpty) return null;
+    final vehicle = _currentUser.defaultVehicle ??
+        const Vehicle(
+          id: 'veh-temp',
+          plateNumber: 'CAB-4821',
+          type: VehicleType.sedan,
+          size: VehicleSize.medium,
+        );
 
-    final defaultVeh = _currentUser.defaultVehicle;
-    final userSize = defaultVeh?.size ?? VehicleSize.medium;
-    final preferEntrance = _currentUser.preferences.preferNearEntrance;
+    final ranked = _engine.scoreAndRankSlots(
+      lot: lot,
+      vehicle: vehicle,
+      preferences: _currentUser.preferences,
+    );
 
-    // Multi-criteria scoring:
-    // Score = w_dist * DistScore + w_size * SizeFit + w_pref * PrefBonus
-    // Lower walking distance is better, matching size has highest fit
-    availableSlots.sort((a, b) {
-      double scoreA = 0;
-      double scoreB = 0;
+    if (ranked.isEmpty) return null;
+    return ranked.first.slot;
+  }
 
-      // Distance factor (lower walking distance = higher score)
-      scoreA += (200 - a.walkingDistanceMeters).clamp(0, 200) * 0.5;
-      scoreB += (200 - b.walkingDistanceMeters).clamp(0, 200) * 0.5;
+  SlotScoreResult? getRecommendedSlotScore(ParkingLot lot) {
+    final vehicle = _currentUser.defaultVehicle ??
+        const Vehicle(
+          id: 'veh-temp',
+          plateNumber: 'CAB-4821',
+          type: VehicleType.sedan,
+          size: VehicleSize.medium,
+        );
 
-      // Size match
-      if (a.size == userSize) scoreA += 50;
-      if (b.size == userSize) scoreB += 50;
+    final ranked = _engine.scoreAndRankSlots(
+      lot: lot,
+      vehicle: vehicle,
+      preferences: _currentUser.preferences,
+    );
 
-      // Entrance preference
-      if (preferEntrance && a.walkingDistanceMeters <= 50) scoreA += 30;
-      if (preferEntrance && b.walkingDistanceMeters <= 50) scoreB += 30;
+    if (ranked.isEmpty) return null;
+    return ranked.first;
+  }
 
-      return scoreB.compareTo(scoreA); // descending
-    });
+  List<SlotScoreResult> getRankedSlotScores(ParkingLot lot) {
+    final vehicle = _currentUser.defaultVehicle ??
+        const Vehicle(
+          id: 'veh-temp',
+          plateNumber: 'CAB-4821',
+          type: VehicleType.sedan,
+          size: VehicleSize.medium,
+        );
 
-    return availableSlots.first;
+    return _engine.scoreAndRankSlots(
+      lot: lot,
+      vehicle: vehicle,
+      preferences: _currentUser.preferences,
+    );
+  }
+
+  SlotScoreResult scoreSlot(ParkingLot lot, ParkingSlot slot) {
+    final vehicle = _currentUser.defaultVehicle ??
+        const Vehicle(
+          id: 'veh-temp',
+          plateNumber: 'CAB-4821',
+          type: VehicleType.sedan,
+          size: VehicleSize.medium,
+        );
+
+    return _engine.scoreSlot(
+      slot: slot,
+      lot: lot,
+      vehicle: vehicle,
+      preferences: _currentUser.preferences,
+    );
   }
 
   // Booking Flow (M5)
@@ -198,34 +294,52 @@ class ParkingStateManager extends ChangeNotifier {
 
   // Upgrade Offer Trigger (M7 / SYS-03)
   void triggerUpgradeOfferCheck() {
-    if (_currentActiveBooking == null ||
-        !_currentUser.preferences.allowUpgradeOffers) {
-      return;
-    }
+    if (_currentActiveBooking == null) return;
 
     final lot = _lots.firstWhere(
       (l) => l.id == _currentActiveBooking!.lotId,
       orElse: () => _lots.first,
     );
 
-    // Find candidate slot that has lower walking distance
-    final candidates = lot.slots
-        .where((s) => s.isAvailable && s.id != _currentActiveBooking!.slotId)
-        .toList();
+    final currentSlot = lot.slots.firstWhere(
+      (s) => s.id == _currentActiveBooking!.slotId,
+      orElse: () => ParkingSlot(
+        id: _currentActiveBooking!.slotId,
+        lotId: lot.id,
+        row: 'A',
+        number: 1,
+        state: SlotState.taken,
+        size: VehicleSize.medium,
+        walkingDistanceMeters: 160,
+      ),
+    );
 
-    if (candidates.isNotEmpty) {
-      candidates.sort(
-          (a, b) => a.walkingDistanceMeters.compareTo(b.walkingDistanceMeters));
-      final bestCandidate = candidates.first;
+    final vehicle = _currentUser.defaultVehicle ??
+        const Vehicle(
+          id: 'veh-temp',
+          plateNumber: 'CAB-4821',
+          type: VehicleType.sedan,
+          size: VehicleSize.medium,
+        );
 
-      _upgradeCandidateSlot = bestCandidate;
+    final eval = _engine.evaluateInTransitUpgrade(
+      lot: lot,
+      currentSlot: currentSlot,
+      vehicle: vehicle,
+      preferences: _currentUser.preferences,
+      currentEtaMinutes: _etaMinutes,
+    );
+
+    _lastUpgradeEvaluation = eval;
+
+    if (eval.isUpgradeOffered && eval.candidateSlotScore != null) {
+      _upgradeCandidateSlot = eval.candidateSlotScore!.slot;
       _upgradeOfferAvailable = true;
 
       _logEvent(
         bookingId: _currentActiveBooking!.id,
         type: ParkingEventType.offered,
-        description:
-            'Upgrade offered: ${bestCandidate.id} (walk ${bestCandidate.walkingDistanceMeters}m)',
+        description: eval.decisionReason,
       );
 
       notifyListeners();
@@ -238,14 +352,34 @@ class ParkingStateManager extends ChangeNotifier {
 
     final oldSlotId = _currentActiveBooking!.slotId;
     final newSlot = _upgradeCandidateSlot!;
-    final savedMeters = 120; // 160m - 40m
+
+    final lot = _lots.firstWhere(
+      (l) => l.id == _currentActiveBooking!.lotId,
+      orElse: () => _lots.first,
+    );
+
+    final oldSlot = lot.slots.firstWhere(
+      (s) => s.id == oldSlotId,
+      orElse: () => ParkingSlot(
+        id: oldSlotId,
+        lotId: lot.id,
+        row: 'A',
+        number: 1,
+        state: SlotState.taken,
+        size: VehicleSize.medium,
+        walkingDistanceMeters: 160,
+      ),
+    );
+
+    final savedMeters = (oldSlot.walkingDistanceMeters - newSlot.walkingDistanceMeters)
+        .clamp(0, 500);
 
     final updatedBooking = _currentActiveBooking!.copyWith(
       slotId: newSlot.id,
       originalSlotId: oldSlotId,
       status: BookingStatus.upgraded,
       distanceSavedMeters: savedMeters,
-      qrToken: 'QR-UPGRADED-${newSlot.id}',
+      qrToken: 'QR-UPGRADED-${newSlot.id}-${DateTime.now().millisecondsSinceEpoch}',
     );
 
     // Update in lot
@@ -273,7 +407,7 @@ class ParkingStateManager extends ChangeNotifier {
     _logEvent(
       bookingId: updatedBooking.id,
       type: ParkingEventType.accepted,
-      description: 'Accepted upgrade to ${newSlot.id} (Saved ${savedMeters}m)',
+      description: 'Accepted upgrade to ${newSlot.id} (Saved ${savedMeters}m walk)',
     );
 
     notifyListeners();

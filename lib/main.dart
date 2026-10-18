@@ -83,6 +83,7 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
               context: ctx,
               booking: booking,
               newSlot: candidate,
+              evaluationResult: state.lastUpgradeEvaluation,
               onAccept: () {
                 state.acceptUpgrade();
                 Navigator.pop(ctx);

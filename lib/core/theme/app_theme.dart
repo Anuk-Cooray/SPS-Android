@@ -221,6 +221,7 @@ abstract final class AppSpace {
 abstract final class AppRadius {
   static const double chip = 6;
   static const double slot = 8;
+  static const double cardSm = 10;
   static const double input = 14;
   static const double card = 16;
   static const double button = 16;

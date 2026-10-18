@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/booking_model.dart';
+import '../../data/models/parking_event_model.dart';
 import '../../data/services/parking_state_manager.dart';
+import 'engine_tuning_modal.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
@@ -22,6 +25,16 @@ class AdminDashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.only(right: AppSpace.md),
             child: Row(
               children: [
+                OutlinedButton.icon(
+                  onPressed: () => EngineTuningModal.show(context),
+                  icon: const Icon(Icons.tune_rounded, size: 16),
+                  label: const Text('Weights'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(80, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                  ),
+                ),
+                const SizedBox(width: AppSpace.xs),
                 OutlinedButton(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -188,6 +201,83 @@ class AdminDashboardScreen extends StatelessWidget {
 
           const SizedBox(height: AppSpace.xl),
 
+          // Optimization Model Hyperparameters Card (SYS-01 & SYS-03)
+          Container(
+            padding: const EdgeInsets.all(AppSpace.lg),
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: c.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.tune_rounded, color: c.accent, size: 20),
+                        const SizedBox(width: AppSpace.xs),
+                        Text(
+                          'Optimization Model (SYS-01)',
+                          style: AppText.title.copyWith(color: c.textPrimary),
+                        ),
+                      ],
+                    ),
+                    TextButton(
+                      onPressed: () => EngineTuningModal.show(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Tune Weights',
+                        style: AppText.caption.copyWith(
+                          color: c.accent,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  'Objective Function: S(s) = wd·Sdist + wz·Ssize + wp·Spref - wu·Pdemand',
+                  style: AppText.caption.copyWith(
+                    color: c.textSecondary,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                const SizedBox(height: AppSpace.md),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildParamPill('wd: ${(state.scoringWeights.distanceWeight * 100).toInt()}% (Distance)', c),
+                    _buildParamPill('wz: ${(state.scoringWeights.sizeFitWeight * 100).toInt()}% (Size Fit)', c),
+                    _buildParamPill('wp: ${(state.scoringWeights.preferenceWeight * 100).toInt()}% (Pref)', c),
+                    _buildParamPill('wu: ${(state.scoringWeights.demandWeight * 100).toInt()}% (Demand)', c),
+                  ],
+                ),
+                const SizedBox(height: AppSpace.sm),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildParamPill('Δd ≥ ${state.scoringWeights.minImprovementMeters}m', c, isThreshold: true),
+                    _buildParamPill('ΔS ≥ ${state.scoringWeights.minScoreImprovementPercent.toInt()}%', c, isThreshold: true),
+                    _buildParamPill('Hold: ${state.scoringWeights.offerTimeoutSeconds}s', c, isThreshold: true),
+                    _buildParamPill('ETA: ≤${state.scoringWeights.upgradeTriggerEtaMinutes}m', c, isThreshold: true),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpace.xl),
+
           // Live Reservations Table
           Text(
             'Live reservations',
@@ -196,6 +286,56 @@ class AdminDashboardScreen extends StatelessWidget {
           const SizedBox(height: AppSpace.md),
 
           ...bookings.take(5).map((b) => _ReservationRow(booking: b)),
+
+          const SizedBox(height: AppSpace.xl),
+
+          // Telemetry Audit Stream (SYS-08)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Telemetry stream (SYS-08)',
+                style: AppText.h2.copyWith(color: c.textPrimary),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: c.accentSoft,
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                ),
+                child: Text(
+                  '${state.events.length} events logged',
+                  style: AppText.caption.copyWith(
+                    color: c.accent,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            'Algorithmic decision evaluations, upgrade offers, and lifecycle transitions.',
+            style: AppText.caption.copyWith(color: c.textSecondary),
+          ),
+          const SizedBox(height: AppSpace.md),
+
+          if (state.events.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(AppSpace.lg),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: c.surface,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: c.border),
+              ),
+              child: Text(
+                'No telemetry events recorded yet.',
+                style: AppText.body.copyWith(color: c.textSecondary),
+              ),
+            )
+          else
+            ...state.events.take(6).map((e) => _TelemetryEventRow(event: e)),
 
           const SizedBox(height: AppSpace.xxl),
         ],
@@ -291,6 +431,27 @@ class AdminDashboardScreen extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildParamPill(String label, AppColors c, {bool isThreshold = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isThreshold ? c.surfaceMuted : c.accentSoft,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: isThreshold ? c.border : c.accent.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Text(
+        label,
+        style: AppText.caption.copyWith(
+          color: isThreshold ? c.textSecondary : c.accent,
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
 }
 
 class _ReservationRow extends StatelessWidget {
@@ -358,6 +519,90 @@ class _ReservationRow extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TelemetryEventRow extends StatelessWidget {
+  final ParkingEvent event;
+
+  const _TelemetryEventRow({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final timeFormatted = DateFormat('h:mm a').format(event.timestamp);
+
+    Color badgeColor;
+    Color badgeText;
+    switch (event.type) {
+      case ParkingEventType.accepted:
+        badgeColor = c.accentSoft;
+        badgeText = c.accent;
+        break;
+      case ParkingEventType.offered:
+        badgeColor = c.accentSoft.withValues(alpha: 0.5);
+        badgeText = c.accent;
+        break;
+      case ParkingEventType.autoCancelled:
+      case ParkingEventType.cancelled:
+        badgeColor = c.surfaceMuted;
+        badgeText = c.textSecondary;
+        break;
+      default:
+        badgeColor = c.surfaceMuted;
+        badgeText = c.textPrimary;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpace.xs),
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.cardSm),
+        border: Border.all(color: c.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  event.type.displayName,
+                  style: AppText.caption.copyWith(
+                    color: badgeText,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              Text(
+                timeFormatted,
+                style: AppText.caption.copyWith(color: c.textTertiary, fontSize: 11),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            event.description,
+            style: AppText.body.copyWith(color: c.textPrimary, fontSize: 13),
+          ),
+          if (event.bookingId.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              'Ref: #${event.bookingId}',
+              style: AppText.caption.copyWith(color: c.textSecondary, fontSize: 11),
+            ),
+          ],
         ],
       ),
     );
