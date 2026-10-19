@@ -1,7 +1,18 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../data/models/booking_model.dart';
+import '../../data/services/billing/mock_pricing.dart' show colomboTime;
+import 'state/billing_state_manager.dart';
+import 'widgets/demand_forecast_chart.dart';
+import 'widgets/invoice_breakdown_card.dart';
 
 class PayAndExitScreen extends StatefulWidget {
   final Booking booking;
@@ -18,241 +29,321 @@ class PayAndExitScreen extends StatefulWidget {
 }
 
 class _PayAndExitScreenState extends State<PayAndExitScreen> {
-  int _selectedPaymentMethod = 0; // 0: Card, 1: Attendant QR
-  bool _isProcessing = false;
+  String _method = 'stripe';
+  bool _didComplete = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_load());
+    });
+  }
+
+  Future<void> _load() async {
+    final state = context.read<BillingStateManager>();
+    await state.loadBooking(widget.booking);
+    _finishIfPaid(state);
+  }
+
+  Future<void> _payOrRefresh(bool refresh) async {
+    final state = context.read<BillingStateManager>();
+    if (refresh) {
+      await state.refreshInvoice();
+    } else {
+      await state.pay(_method);
+    }
+    _finishIfPaid(state);
+  }
+
+  void _finishIfPaid(BillingStateManager state) {
+    final invoice = state.invoice;
+    if (mounted &&
+        !_didComplete &&
+        invoice != null &&
+        invoice.isPaid &&
+        invoice.bookingId == widget.booking.id) {
+      _didComplete = true;
+      widget.onPaymentCompleted(invoice.quote.total);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final baseFee = widget.booking.estimatedFee;
-    final extFee = widget.booking.extensionFee > 0 ? widget.booking.extensionFee : 50;
-    final totalDue = baseFee + extFee;
-
+    final state = context.watch<BillingStateManager>();
+    final quote = state.quote?.bookingId == widget.booking.id
+        ? state.quote
+        : null;
+    final invoice = state.invoice?.bookingId == widget.booking.id
+        ? state.invoice
+        : null;
+    final session = invoice == null ? null : state.session;
+    final refresh =
+        invoice != null &&
+        ((invoice.status == 'pending' && session != null) ||
+            (invoice.status == 'awaiting_guard' && _method == 'guard'));
+    final date = DateFormat('d MMM, HH:mm');
     return Scaffold(
       backgroundColor: c.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: AppSpace.sm),
-
-              // Header
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: c.border),
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.chevron_left_rounded, color: c.textPrimary, size: 24),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpace.md),
-                  Text(
-                    'Pay and exit',
-                    style: AppText.h2.copyWith(color: c.textPrimary),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: AppSpace.xl),
-
-              // Total due display
-              Text(
-                'Total due',
-                style: AppText.caption.copyWith(color: c.textSecondary),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'LKR $totalDue',
-                style: AppText.display.copyWith(
-                  color: c.textPrimary,
-                  fontSize: 44,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${widget.booking.lotName} · 10:21 AM – 12:35 PM',
-                style: AppText.body.copyWith(color: c.textSecondary),
-              ),
-
-              const SizedBox(height: AppSpace.xl),
-
-              // Invoice itemized card
-              Container(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
                 padding: const EdgeInsets.all(AppSpace.lg),
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: c.border),
-                ),
-                child: Column(
-                  children: [
-                    _buildInvoiceRow('Parking · 2 h 14 min', 'LKR $baseFee'),
-                    const SizedBox(height: AppSpace.sm),
-                    _buildInvoiceRow('Extension · 15 min', 'LKR $extFee'),
-                    const SizedBox(height: AppSpace.sm),
-                    _buildInvoiceRow(
-                      'Upgrade ${widget.booking.originalSlotId ?? 'A-06'} → ${widget.booking.slotId}',
-                      'LKR 0',
-                    ),
-                    const SizedBox(height: AppSpace.md),
-                    const Divider(),
-                    const SizedBox(height: AppSpace.md),
-                    _buildInvoiceRow(
-                      'Total',
-                      'LKR $totalDue',
-                      isBold: true,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: AppSpace.xl),
-
-              // Pay with section
-              Text(
-                'Pay with',
-                style: AppText.label.copyWith(color: c.textSecondary),
-              ),
-              const SizedBox(height: AppSpace.xs),
-
-              // Option 1: Saved card
-              GestureDetector(
-                onTap: () => setState(() => _selectedPaymentMethod = 0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpace.md,
-                    vertical: AppSpace.md,
-                  ),
-                  decoration: BoxDecoration(
-                    color: c.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    border: Border.all(
-                      color: _selectedPaymentMethod == 0 ? c.textPrimary : c.border,
-                      width: _selectedPaymentMethod == 0 ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: Row(
+                children: [
+                  Row(
                     children: [
-                      Icon(
-                        _selectedPaymentMethod == 0
-                            ? Icons.radio_button_checked_rounded
-                            : Icons.radio_button_off_rounded,
-                        color: c.textPrimary,
-                        size: 20,
+                      Container(
+                        width: AppSize.iconButton,
+                        height: AppSize.iconButton,
+                        decoration: BoxDecoration(
+                          color: c.surface,
+                          borderRadius: BorderRadius.circular(AppRadius.input),
+                          border: Border.all(color: c.border),
+                        ),
+                        child: IconButton(
+                          tooltip: 'Back',
+                          icon: Icon(
+                            Icons.chevron_left_rounded,
+                            color: c.textPrimary,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
                       ),
                       const SizedBox(width: AppSpace.md),
-                      Expanded(
-                        child: Text(
-                          'Visa •••• 4821',
-                          style: AppText.title.copyWith(color: c.textPrimary),
+                      Text(
+                        'Pay and exit',
+                        style: AppText.h2.copyWith(color: c.textPrimary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.xl),
+                  Text(
+                    'Sandbox billing · no real charges',
+                    style: AppText.caption.copyWith(color: c.textSecondary),
+                  ),
+                  const SizedBox(height: AppSpace.sm),
+                  Text(
+                    'Total due',
+                    style: AppText.caption.copyWith(color: c.textSecondary),
+                  ),
+                  const SizedBox(height: AppSpace.xxs),
+                  Text(
+                    quote == null ? '—' : 'LKR ${quote.total}',
+                    style: AppText.display.copyWith(
+                      color: c.textPrimary,
+                      fontSize: 44,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    widget.booking.lotName,
+                    style: AppText.body.copyWith(color: c.textSecondary),
+                  ),
+                  if (quote != null) ...[
+                    Text(
+                      '${date.format(colomboTime(quote.entryTime))} – '
+                      '${date.format(colomboTime(quote.exitTime))} · Colombo',
+                      style: AppText.caption.copyWith(color: c.textSecondary),
+                    ),
+                    Text(
+                      _duration(quote.exitTime.difference(quote.entryTime)),
+                      style: AppText.body.copyWith(color: c.textSecondary),
+                    ),
+                    const SizedBox(height: AppSpace.xl),
+                    InvoiceBreakdownCard(quote: quote),
+                    const SizedBox(height: AppSpace.xs),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: Text(
+                        'How this fee was calculated',
+                        style: AppText.caption.copyWith(color: c.textSecondary),
+                      ),
+                      children: [
+                        Text(
+                          quote.explanation,
+                          style: AppText.caption.copyWith(
+                            color: c.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (state.error == null) ...[
+                    const SizedBox(height: AppSpace.xl),
+                    Center(
+                      child: CircularProgressIndicator(color: c.textPrimary),
+                    ),
+                  ],
+                  if (state.error != null) ...[
+                    const SizedBox(height: AppSpace.sm),
+                    Text(
+                      state.error!,
+                      key: const Key('billing_error'),
+                      style: AppText.body.copyWith(color: c.textPrimary),
+                    ),
+                    if (quote == null)
+                      TertiaryButton(
+                        text: 'Retry quote',
+                        onPressed: state.isBusy ? null : _load,
+                      ),
+                  ],
+                  if (quote != null) ...[
+                    const SizedBox(height: AppSpace.xl),
+                    Text(
+                      'Pay with',
+                      style: AppText.label.copyWith(color: c.textSecondary),
+                    ),
+                    const SizedBox(height: AppSpace.xs),
+                    _option('stripe', 'Visa •••• 4821 · Sandbox', state.isBusy),
+                    const SizedBox(height: AppSpace.xs),
+                    _option('payhere', 'PayHere · Sandbox', state.isBusy),
+                    const SizedBox(height: AppSpace.xs),
+                    _option('guard', 'Pay at booth (guard)', state.isBusy),
+                  ],
+                  if (invoice != null && !invoice.isPaid) ...[
+                    const SizedBox(height: AppSpace.lg),
+                    Text(
+                      invoice.status == 'awaiting_guard'
+                          ? 'Awaiting guard confirmation'
+                          : invoice.status == 'failed'
+                          ? 'Payment failed. Try again.'
+                          : 'Awaiting sandbox payment confirmation',
+                      style: AppText.title.copyWith(color: c.textPrimary),
+                    ),
+                    const SizedBox(height: AppSpace.xs),
+                    SelectableText(
+                      'Invoice ${invoice.id}',
+                      style: AppText.caption.copyWith(color: c.textSecondary),
+                    ),
+                    if (invoice.status == 'awaiting_guard') ...[
+                      const SizedBox(height: AppSpace.sm),
+                      Center(
+                        child: QrImageView(
+                          size: 150,
+                          backgroundColor: Colors.white,
+                          data: jsonEncode({
+                            'type': 'parking_invoice',
+                            'invoice_id': invoice.id,
+                            'booking_id': invoice.bookingId,
+                            'amount': invoice.quote.total,
+                            'currency': 'LKR',
+                          }),
                         ),
                       ),
                       Text(
-                        'Default',
+                        'Invoice reference only · not an exit QR',
+                        textAlign: TextAlign.center,
                         style: AppText.caption.copyWith(color: c.textSecondary),
                       ),
                     ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: AppSpace.xs),
-
-              // Option 2: Attendant QR
-              GestureDetector(
-                onTap: () => setState(() => _selectedPaymentMethod = 1),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpace.md,
-                    vertical: AppSpace.md,
-                  ),
-                  decoration: BoxDecoration(
-                    color: c.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    border: Border.all(
-                      color: _selectedPaymentMethod == 1 ? c.textPrimary : c.border,
-                      width: _selectedPaymentMethod == 1 ? 1.5 : 1.0,
+                    if (session?.isMock ?? false)
+                      Text(
+                        'Mock session · no funds charged',
+                        style: AppText.caption.copyWith(color: c.textSecondary),
+                      ),
+                  ],
+                  if (state.isForecastLoading) ...[
+                    const SizedBox(height: AppSpace.xl),
+                    Text(
+                      'Loading synthetic demand…',
+                      style: AppText.caption.copyWith(color: c.textSecondary),
                     ),
+                  ] else if (state.forecast.isNotEmpty) ...[
+                    const SizedBox(height: AppSpace.xl),
+                    DemandForecastChart(points: state.forecast),
+                  ] else if (state.forecastError != null) ...[
+                    const SizedBox(height: AppSpace.xl),
+                    Text(
+                      state.forecastError!,
+                      style: AppText.caption.copyWith(color: c.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.lg,
+                AppSpace.sm,
+                AppSpace.lg,
+                AppSpace.md,
+              ),
+              child: Column(
+                children: [
+                  PrimaryButton(
+                    text: refresh
+                        ? 'Check status'
+                        : _method == 'guard'
+                        ? 'Pay at booth'
+                        : 'Pay LKR ${quote?.total ?? '—'}',
+                    isLoading: state.isBusy,
+                    onPressed: quote == null || _didComplete
+                        ? null
+                        : () => _payOrRefresh(refresh),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _selectedPaymentMethod == 1
-                            ? Icons.radio_button_checked_rounded
-                            : Icons.radio_button_off_rounded,
-                        color: c.textPrimary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: AppSpace.md),
-                      Expanded(
-                        child: Text(
-                          'Pay attendant with QR invoice',
-                          style: AppText.title.copyWith(color: c.textPrimary),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    'Payment must be confirmed before exit. Barrier integration is pending.',
+                    textAlign: TextAlign.center,
+                    style: AppText.caption.copyWith(color: c.textSecondary),
                   ),
-                ),
+                ],
               ),
-
-              const Spacer(),
-
-              // Pay CTA
-              PrimaryButton(
-                text: 'Pay LKR $totalDue',
-                isLoading: _isProcessing,
-                onPressed: () {
-                  setState(() => _isProcessing = true);
-                  Future.delayed(const Duration(milliseconds: 700), () {
-                    if (mounted) {
-                      widget.onPaymentCompleted(totalDue);
-                    }
-                  });
-                },
-              ),
-
-              const SizedBox(height: AppSpace.xs),
-
-              Center(
-                child: Text(
-                  'The barrier opens once payment is confirmed.',
-                  style: AppText.caption.copyWith(color: c.textSecondary),
-                ),
-              ),
-
-              const SizedBox(height: AppSpace.md),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildInvoiceRow(String label, String amount, {bool isBold = false}) {
-    final c = context.colors;
-    final style = isBold
-        ? AppText.title.copyWith(
-            color: c.textPrimary,
-            fontWeight: FontWeight.w700,
-          )
-        : AppText.body.copyWith(color: c.textPrimary);
+  String _duration(Duration duration) {
+    final minutes = duration.inMinutes;
+    if (minutes == 0) return 'Parked less than 1 min';
+    return 'Parked ${minutes ~/ 60} h ${minutes % 60} min';
+  }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: style),
-        Text(amount, style: style),
-      ],
+  Widget _option(String method, String label, bool busy) {
+    final c = context.colors;
+    final selected = _method == method;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: InkWell(
+        onTap: busy ? null : () => setState(() => _method = method),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpace.md),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(
+              color: selected ? c.textPrimary : c.border,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: c.textPrimary,
+                size: 20,
+              ),
+              const SizedBox(width: AppSpace.md),
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppText.title.copyWith(color: c.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

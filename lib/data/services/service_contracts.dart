@@ -1,3 +1,7 @@
+import '../models/billing/demand_forecast_point.dart';
+import '../models/billing/fee_quote.dart';
+import '../models/billing/invoice.dart';
+import '../models/billing/payment_session.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/booking_model.dart';
 import '../models/parking_lot_model.dart';
@@ -43,6 +47,30 @@ abstract interface class BillingService {
     required String bookingId,
     required int amount,
     required String paymentMethod,
+  });
+
+  Future<FeeQuote> quoteFee({
+    required String bookingId,
+    required DateTime entryTime,
+    required DateTime exitTime,
+    required String lotId,
+    int extensionMinutes = 0,
+    int arrivalExtensionFee = 0,
+    String? upgradeFromSlotId,
+    String? upgradeToSlotId,
+  });
+  Future<Invoice> createInvoice({
+    required String bookingId,
+    required FeeQuote quote,
+  });
+  Future<PaymentSession> startPayment({
+    required String invoiceId,
+    required String method,
+  });
+  Future<Invoice> getInvoice(String invoiceId);
+  Future<List<DemandForecastPoint>> getDemandForecast({
+    required String lotId,
+    int horizonHours = 24,
   });
 }
 

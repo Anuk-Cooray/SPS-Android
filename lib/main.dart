@@ -6,11 +6,13 @@ import 'data/models/parking_lot_model.dart';
 import 'data/models/parking_slot_model.dart';
 import 'data/models/vehicle_model.dart';
 import 'data/services/parking_state_manager.dart';
+import 'data/services/billing/billing_service_factory.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/barrier_checkin/check_in_screen.dart';
 import 'features/barrier_checkin/parked_screen.dart';
 import 'features/billing/pay_and_exit_screen.dart';
+import 'features/billing/state/billing_state_manager.dart';
 import 'features/navigation_shell.dart';
 import 'features/reoptimization/book_slot_screen.dart';
 import 'features/reoptimization/late_arrival_screen.dart';
@@ -20,8 +22,13 @@ import 'features/reoptimization/upgrade_offer_screen.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ParkingStateManager(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ParkingStateManager()),
+        ChangeNotifierProvider(
+          create: (_) => BillingStateManager(service: createBillingService()),
+        ),
+      ],
       child: const SmartParkingApp(),
     ),
   );
@@ -148,7 +155,10 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
       context,
       MaterialPageRoute(
         builder: (ctx) => PayAndExitScreen(
-          booking: booking,
+          booking: context.read<ParkingStateManager>().bookings.firstWhere(
+            (current) => current.id == booking.id,
+            orElse: () => booking,
+          ),
           onPaymentCompleted: (amount) {
             context.read<ParkingStateManager>().completePayment(amount);
             Navigator.pop(ctx); // pop pay
