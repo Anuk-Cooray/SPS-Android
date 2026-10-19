@@ -9,7 +9,10 @@ import os
 import sys
 import unittest
 
-from scoring_engine import score_slot
+try:
+    from eval.scoring_engine import score_slot
+except ImportError:
+    from scoring_engine import score_slot
 
 class TestScoringParity(unittest.TestCase):
     def test_shared_test_vectors_parity(self):
