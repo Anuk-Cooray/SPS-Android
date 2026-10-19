@@ -38,6 +38,7 @@ class Booking {
   final String qrToken;
   final DateTime? checkedInAt;
   final DateTime? completedAt;
+  final DateTime? holdExpiresAt;
 
   const Booking({
     required this.id,
@@ -59,10 +60,20 @@ class Booking {
     required this.qrToken,
     this.checkedInAt,
     this.completedAt,
+    this.holdExpiresAt,
   });
 
   DateTime get cancelDeadline => arrivalTime.add(const Duration(minutes: 15));
   DateTime get lateWarningTime => arrivalTime.add(const Duration(minutes: 10));
+
+  DateTime get effectiveHoldDeadline => holdExpiresAt ?? cancelDeadline;
+
+  Duration get remainingHoldDuration {
+    final diff = effectiveHoldDeadline.difference(DateTime.now());
+    return diff.isNegative ? Duration.zero : diff;
+  }
+
+  bool get isHoldExpired => remainingHoldDuration == Duration.zero;
 
   bool get isActive =>
       status == BookingStatus.reserved ||
@@ -90,6 +101,7 @@ class Booking {
     String? qrToken,
     DateTime? checkedInAt,
     DateTime? completedAt,
+    DateTime? holdExpiresAt,
   }) {
     return Booking(
       id: id ?? this.id,
@@ -111,6 +123,7 @@ class Booking {
       qrToken: qrToken ?? this.qrToken,
       checkedInAt: checkedInAt ?? this.checkedInAt,
       completedAt: completedAt ?? this.completedAt,
+      holdExpiresAt: holdExpiresAt ?? this.holdExpiresAt,
     );
   }
 
@@ -134,6 +147,7 @@ class Booking {
         'qrToken': qrToken,
         'checkedInAt': checkedInAt?.toIso8601String(),
         'completedAt': completedAt?.toIso8601String(),
+        'holdExpiresAt': holdExpiresAt?.toIso8601String(),
       };
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
@@ -162,6 +176,9 @@ class Booking {
             : null,
         completedAt: json['completedAt'] != null
             ? DateTime.tryParse(json['completedAt'] as String)
+            : null,
+        holdExpiresAt: json['holdExpiresAt'] != null
+            ? DateTime.tryParse(json['holdExpiresAt'] as String)
             : null,
       );
 }

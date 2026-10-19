@@ -70,8 +70,8 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Tap "Test New User"
-    await tester.tap(find.text('Test New User'));
+    // Tap "Register New Driver"
+    await tester.tap(find.text('Register New Driver'));
     await tester.pumpAndSettle();
 
     // Tap Send Verification Code

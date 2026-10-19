@@ -258,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () => _selectPresetEmail('newdriver@sliit.lk'),
               icon: Icon(Icons.person_add_alt_1_rounded, size: 16, color: c.accent),
               label: Text(
-                'Test New User',
+                'Register New Driver',
                 style: AppText.caption.copyWith(
                   color: c.accent,
                   fontWeight: FontWeight.w600,

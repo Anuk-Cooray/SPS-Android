@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../core/widgets/campus_map_view.dart';
+import '../../core/widgets/hold_countdown_timer_widget.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/services/parking_state_manager.dart';
 
@@ -230,6 +231,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     ],
                   ),
 
+                  const SizedBox(height: AppSpace.sm),
+                  HoldCountdownTimerWidget(booking: active, compact: true),
                   const SizedBox(height: AppSpace.md),
 
                   // In-Transit Simulation Controller Bar

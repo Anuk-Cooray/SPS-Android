@@ -64,4 +64,37 @@ class ParkingSlot {
       cameraId: cameraId ?? this.cameraId,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'lotId': lotId,
+        'row': row,
+        'number': number,
+        'state': state.name,
+        'size': size.name,
+        'type': type.name,
+        'walkingDistanceMeters': walkingDistanceMeters,
+        'cameraId': cameraId,
+      };
+
+  factory ParkingSlot.fromJson(Map<String, dynamic> json) => ParkingSlot(
+        id: json['id'] as String,
+        lotId: json['lotId'] as String? ?? 'lot-main',
+        row: json['row'] as String? ?? 'A',
+        number: json['number'] as int? ?? 1,
+        state: SlotState.values.firstWhere(
+          (s) => s.name == json['state'],
+          orElse: () => SlotState.free,
+        ),
+        size: VehicleSize.values.firstWhere(
+          (s) => s.name == json['size'],
+          orElse: () => VehicleSize.medium,
+        ),
+        type: SlotType.values.firstWhere(
+          (s) => s.name == json['type'],
+          orElse: () => SlotType.normal,
+        ),
+        walkingDistanceMeters: json['walkingDistanceMeters'] as int? ?? 100,
+        cameraId: json['cameraId'] as String? ?? '',
+      );
 }

@@ -56,4 +56,35 @@ class ParkingLot {
       slots: slots ?? this.slots,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'campusZone': campusZone,
+        'latitude': latitude,
+        'longitude': longitude,
+        'distanceMeters': distanceMeters,
+        'hourlyRate': hourlyRate,
+        'totalSlots': totalSlots,
+        'freeSlots': freeSlots,
+        'openingHours': openingHours,
+        'slots': slots.map((s) => s.toJson()).toList(),
+      };
+
+  factory ParkingLot.fromJson(Map<String, dynamic> json) => ParkingLot(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        campusZone: json['campusZone'] as String? ?? 'SLIIT Malabe Campus',
+        latitude: (json['latitude'] as num?)?.toDouble() ?? 6.9147,
+        longitude: (json['longitude'] as num?)?.toDouble() ?? 79.9729,
+        distanceMeters: json['distanceMeters'] as int? ?? 100,
+        hourlyRate: json['hourlyRate'] as int? ?? 100,
+        totalSlots: json['totalSlots'] as int? ?? 18,
+        freeSlots: json['freeSlots'] as int? ?? 0,
+        openingHours: json['openingHours'] as String? ?? '06:00 AM - 10:00 PM',
+        slots: (json['slots'] as List<dynamic>?)
+                ?.map((s) => ParkingSlot.fromJson(s as Map<String, dynamic>))
+                .toList() ??
+            const [],
+      );
 }

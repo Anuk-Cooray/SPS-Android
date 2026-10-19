@@ -1,0 +1,376 @@
+// hold_countdown_timer_widget.dart
+// Smart Parking (J26-IT-335) — Live Hold-Time Countdown & Auto-Release Widget
+
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../theme/app_theme.dart';
+import '../../data/models/booking_model.dart';
+import '../../data/services/parking_state_manager.dart';
+
+/// Reusable countdown and auto-release card for active parking slot holds.
+class HoldCountdownTimerWidget extends StatefulWidget {
+  final Booking booking;
+  final bool compact;
+  final VoidCallback? onCheckedIn;
+  final VoidCallback? onExpired;
+
+  const HoldCountdownTimerWidget({
+    super.key,
+    required this.booking,
+    this.compact = false,
+    this.onCheckedIn,
+    this.onExpired,
+  });
+
+  @override
+  State<HoldCountdownTimerWidget> createState() => _HoldCountdownTimerWidgetState();
+}
+
+class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
+  Timer? _ticker;
+  Duration _remaining = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateRemaining();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        _updateRemaining();
+      }
+    });
+  }
+
+  void _updateRemaining() {
+    final diff = widget.booking.effectiveHoldDeadline.difference(DateTime.now());
+    if (diff.isNegative || diff == Duration.zero) {
+      if (_remaining != Duration.zero) {
+        setState(() => _remaining = Duration.zero);
+        widget.onExpired?.call();
+        // Auto-release booking via state manager
+        final state = context.read<ParkingStateManager>();
+        if (widget.booking.isActive &&
+            (widget.booking.status == BookingStatus.reserved ||
+                widget.booking.status == BookingStatus.upgraded)) {
+          state.cancelBooking(autoCancelled: true);
+        }
+      } else {
+        setState(() => _remaining = Duration.zero);
+      }
+    } else {
+      setState(() => _remaining = diff);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HoldCountdownTimerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.booking.effectiveHoldDeadline != widget.booking.effectiveHoldDeadline) {
+      _updateRemaining();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration d) {
+    if (d == Duration.zero) return '00:00';
+    final minutes = d.inMinutes;
+    final seconds = d.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Color _getStatusColor(AppColors c) {
+    if (_remaining == Duration.zero) return c.danger;
+    if (_remaining.inSeconds <= 60) return c.danger;
+    if (_remaining.inMinutes < 5) return c.warning;
+    return c.accent;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final statusColor = _getStatusColor(c);
+    final isExpired = _remaining == Duration.zero;
+
+    // Total hold window (default 15 minutes = 900 seconds)
+    final totalSeconds = widget.booking.effectiveHoldDeadline
+        .difference(widget.booking.bookedAt)
+        .inSeconds
+        .clamp(60, 3600);
+    final progress = (1.0 - (_remaining.inSeconds / totalSeconds)).clamp(0.0, 1.0);
+
+    if (widget.compact) {
+      return _buildCompact(context, c, statusColor, isExpired, progress);
+    }
+
+    return _buildExpanded(context, c, statusColor, isExpired, progress);
+  }
+
+  Widget _buildCompact(
+    BuildContext context,
+    AppColors c,
+    Color statusColor,
+    bool isExpired,
+    double progress,
+  ) {
+    final state = context.watch<ParkingStateManager>();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.sm),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.input),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isExpired ? Icons.cancel_outlined : Icons.timer_outlined,
+                size: 16,
+                color: statusColor,
+              ),
+              const SizedBox(width: AppSpace.xs),
+              Expanded(
+                child: Text(
+                  isExpired ? 'Hold expired · Auto-released' : 'Hold expires in ${_formatDuration(_remaining)}',
+                  style: AppText.caption.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (!isExpired)
+                InkWell(
+                  onTap: () => state.fastForwardHoldTimer(remaining: const Duration(seconds: 10)),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: c.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bolt_rounded, size: 12, color: c.accent),
+                        const SizedBox(width: 2),
+                        Text(
+                          'Test 10s',
+                          style: AppText.overline.copyWith(
+                            color: c.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (!isExpired) ...[
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: c.border,
+                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                minHeight: 3,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpanded(
+    BuildContext context,
+    AppColors c,
+    Color statusColor,
+    bool isExpired,
+    double progress,
+  ) {
+    final state = context.watch<ParkingStateManager>();
+    final minutes = _remaining.inMinutes;
+    final seconds = _remaining.inSeconds % 60;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.lg),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: statusColor.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: statusColor.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.xs),
+                  Text(
+                    'HOLD RESERVATION TIMER',
+                    style: AppText.overline.copyWith(
+                      color: c.textSecondary,
+                      letterSpacing: 1.1,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  isExpired
+                      ? 'EXPIRED'
+                      : _remaining.inMinutes < 5
+                          ? 'EXPIRING SOON'
+                          : 'HOLD ACTIVE',
+                  style: AppText.overline.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppSpace.md),
+
+          // Main Countdown Display
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                style: AppText.h1.copyWith(
+                  color: statusColor,
+                  fontSize: 38,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              Text(
+                isExpired ? 'auto-released' : 'remaining hold',
+                style: AppText.caption.copyWith(
+                  color: c.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+          Text(
+            isExpired
+                ? 'Your 15-minute barrier hold expired. Slot ${widget.booking.slotId} has been returned to the campus availability pool.'
+                : 'Your barrier gate pass is guaranteed. Arrive and scan before expiry to lock in your slot.',
+            style: AppText.caption.copyWith(
+              color: c.textSecondary,
+              height: 1.35,
+            ),
+          ),
+
+          const SizedBox(height: AppSpace.md),
+
+          // Progress Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: c.border,
+              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+              minHeight: 5,
+            ),
+          ),
+
+          if (!isExpired) ...[
+            const SizedBox(height: AppSpace.md),
+            const Divider(),
+            const SizedBox(height: AppSpace.xs),
+
+            // Evaluation / Demo Simulation Row
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: c.textPrimary,
+                      side: BorderSide(color: c.border),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.input),
+                      ),
+                    ),
+                    icon: Icon(Icons.bolt_rounded, size: 16, color: c.accent),
+                    label: Text(
+                      'Test Auto-Release (10s)',
+                      style: AppText.caption.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    onPressed: () {
+                      state.fastForwardHoldTimer(remaining: const Duration(seconds: 10));
+                    },
+                  ),
+                ),
+                const SizedBox(width: AppSpace.sm),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: c.textPrimary,
+                    side: BorderSide(color: c.border),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.input),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_alarm_rounded, size: 16),
+                  label: Text(
+                    '+5m',
+                    style: AppText.caption.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  onPressed: () {
+                    state.extendHoldDuration(extension: const Duration(minutes: 5));
+                  },
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

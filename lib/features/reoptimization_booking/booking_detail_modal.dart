@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
+import '../../core/widgets/hold_countdown_timer_widget.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/models/parking_event_model.dart';
 import '../../data/services/parking_state_manager.dart';
@@ -261,6 +262,17 @@ class BookingDetailModal extends StatelessWidget {
                   const SizedBox(height: AppSpace.md),
                 ],
 
+                // Live Hold-Time Countdown & Auto-Release Card
+                if (booking.status == BookingStatus.reserved ||
+                    booking.status == BookingStatus.upgraded) ...[
+                  HoldCountdownTimerWidget(
+                    booking: booking,
+                    compact: false,
+                    onCheckedIn: () => state.checkIn(),
+                  ),
+                  const SizedBox(height: AppSpace.md),
+                ],
+
                 // Session Metadata Card
                 Container(
                   padding: const EdgeInsets.all(AppSpace.md),
@@ -453,6 +465,35 @@ class BookingDetailModal extends StatelessWidget {
                     text: 'Show Gate QR Code',
                     onPressed: () => _showQrDialog(context),
                   ),
+                  if (booking.status == BookingStatus.reserved ||
+                      booking.status == BookingStatus.upgraded) ...[
+                    const SizedBox(height: AppSpace.sm),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: c.textPrimary,
+                        side: BorderSide(color: c.border),
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.button),
+                        ),
+                      ),
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                      label: Text(
+                        'Simulate Barrier Check-In (Scan QR)',
+                        style: AppText.button.copyWith(color: c.textPrimary),
+                      ),
+                      onPressed: () {
+                        state.checkIn();
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Barrier pass verified. Welcome to ${booking.lotName}!'),
+                            backgroundColor: c.primary,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ] else ...[
                   PrimaryButton(
                     text: 'Book Again at ${booking.lotName}',

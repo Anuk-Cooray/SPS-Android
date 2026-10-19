@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_theme.dart';
@@ -80,12 +82,56 @@ class ParkingStateManager extends ChangeNotifier {
       }
 
       _refreshActiveBooking();
+
+      if (!_isTestRuntime) {
+        unawaited(_firestore.seedInitialLotsIfEmpty(_lots));
+        _subscribeToFirestoreStreams();
+      }
     } catch (_) {
       _isLoggedIn = false;
     } finally {
       _isInitialized = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifyListeners();
+      });
+    }
+  }
+
+  StreamSubscription<List<ParkingLot>>? _lotsSubscription;
+  StreamSubscription<List<Booking>>? _bookingsSubscription;
+
+  void _subscribeToFirestoreStreams() {
+    if (_isTestRuntime) return;
+    _lotsSubscription?.cancel();
+    _lotsSubscription = _firestore.streamLots().listen((cloudLots) {
+      if (cloudLots.isNotEmpty) {
+        for (final cloudLot in cloudLots) {
+          final idx = _lots.indexWhere((l) => l.id == cloudLot.id);
+          if (idx != -1) {
+            _lots[idx] = cloudLot;
+          } else {
+            _lots.add(cloudLot);
+          }
+        }
+        notifyListeners();
+      }
+    });
+
+    if (_currentUser.email.isNotEmpty) {
+      _bookingsSubscription?.cancel();
+      _bookingsSubscription = _firestore.streamUserBookings(_currentUser.id).listen((cloudBookings) {
+        if (cloudBookings.isNotEmpty) {
+          for (final b in cloudBookings) {
+            final idx = _bookings.indexWhere((x) => x.id == b.id);
+            if (idx != -1) {
+              _bookings[idx] = b;
+            } else {
+              _bookings.insert(0, b);
+            }
+          }
+          _refreshActiveBooking();
+          notifyListeners();
+        }
       });
     }
   }
@@ -209,8 +255,17 @@ class ParkingStateManager extends ChangeNotifier {
     final active = _bookings.where((b) => b.userId == _currentUser.id && b.isActive).toList();
     if (active.isNotEmpty) {
       _currentActiveBooking = active.first;
+      if ((_currentActiveBooking!.status == BookingStatus.reserved ||
+              _currentActiveBooking!.status == BookingStatus.upgraded) &&
+          _currentActiveBooking!.isHoldExpired) {
+        cancelBooking(autoCancelled: true);
+      } else if (_currentActiveBooking!.status == BookingStatus.reserved ||
+          _currentActiveBooking!.status == BookingStatus.upgraded) {
+        _startHoldTimer();
+      }
     } else {
       _currentActiveBooking = null;
+      _stopHoldTimer();
     }
   }
 
@@ -246,20 +301,34 @@ class ParkingStateManager extends ChangeNotifier {
   }
 
   Future<void> login(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
     _isLoggedIn = true;
-    if (email.toLowerCase() == 'anuk@example.com' || email.toLowerCase() == 'demo@example.com') {
-      _currentUser = MockData.initialUser.copyWith(email: email);
+
+    // Check Cloud Firestore for existing driver profile
+    User? cloudUser;
+    try {
+      cloudUser = await _firestore.fetchUser(cleanEmail);
+    } catch (_) {}
+
+    if (cloudUser != null) {
+      _currentUser = cloudUser;
+    } else if (cleanEmail == 'anuk@example.com' || cleanEmail == 'anuk@sliit.lk') {
+      _currentUser = MockData.initialUser.copyWith(email: cleanEmail);
+      unawaited(_firestore.saveUser(_currentUser));
     } else {
       _currentUser = User(
-        id: 'user-${DateTime.now().millisecondsSinceEpoch}',
-        name: email.split('@').first,
-        email: email,
+        id: 'usr-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        name: cleanEmail.split('@').first.replaceAll('.', ' ').toUpperCase(),
+        email: cleanEmail,
         phone: '+94 77 123 4567',
         vehicles: const [],
         preferences: const UserPreferences(),
       );
+      unawaited(_firestore.saveUser(_currentUser));
     }
+
     await _persistSession();
+    _subscribeToFirestoreStreams();
     notifyListeners();
   }
 
@@ -267,11 +336,14 @@ class ParkingStateManager extends ChangeNotifier {
     final updatedVehicles = [vehicle.copyWith(isDefault: true)];
     _currentUser = _currentUser.copyWith(vehicles: updatedVehicles);
     await _persistSession();
+    unawaited(_firestore.saveUser(_currentUser));
     notifyListeners();
   }
 
   Future<void> logout() async {
     _isLoggedIn = false;
+    _lotsSubscription?.cancel();
+    _bookingsSubscription?.cancel();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('sp_is_logged_in');
@@ -290,6 +362,7 @@ class ParkingStateManager extends ChangeNotifier {
     updated.add(vehicle);
     _currentUser = _currentUser.copyWith(vehicles: updated);
     await _persistSession();
+    unawaited(_firestore.saveUser(_currentUser));
     notifyListeners();
   }
 
@@ -299,12 +372,14 @@ class ParkingStateManager extends ChangeNotifier {
     }).toList();
     _currentUser = _currentUser.copyWith(vehicles: updated);
     await _persistSession();
+    unawaited(_firestore.saveUser(_currentUser));
     notifyListeners();
   }
 
   Future<void> updatePreferences(UserPreferences prefs) async {
     _currentUser = _currentUser.copyWith(preferences: prefs);
     await _persistSession();
+    unawaited(_firestore.saveUser(_currentUser));
     notifyListeners();
   }
 
@@ -395,6 +470,7 @@ class ParkingStateManager extends ChangeNotifier {
           size: VehicleSize.medium,
         );
 
+    final holdExpiry = arrivalTime.add(const Duration(minutes: 15));
     final newBooking = Booking(
       id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
       userId: _currentUser.id,
@@ -409,6 +485,7 @@ class ParkingStateManager extends ChangeNotifier {
       status: BookingStatus.reserved,
       estimatedFee: lot.hourlyRate * durationHours,
       qrToken: 'QR-TOKEN-${slot.id}-${DateTime.now().millisecondsSinceEpoch}',
+      holdExpiresAt: holdExpiry,
     );
 
     // Update slot state to taken/yours in lot
@@ -438,11 +515,19 @@ class ParkingStateManager extends ChangeNotifier {
     _hasTriggeredAutoUpgrade = false;
     _hasArrivedAtDestination = false;
     pauseMovementSimulation();
+    _startHoldTimer();
+
+    unawaited(_firestore.updateSlotState(
+      lotId: lot.id,
+      slotId: slot.id,
+      state: SlotState.taken,
+      reservedBy: _currentUser.id,
+    ));
 
     _logEvent(
       bookingId: newBooking.id,
       type: ParkingEventType.booked,
-      description: 'Booked slot ${slot.id} in ${lot.name}',
+      description: 'Booked slot ${slot.id} in ${lot.name} · Hold expires in 15 mins',
     );
 
     notifyListeners();
@@ -630,6 +715,18 @@ class ParkingStateManager extends ChangeNotifier {
     _upgradeCandidateSlot = null;
     _firestore.saveBooking(updatedBooking);
 
+    unawaited(_firestore.updateSlotState(
+      lotId: lot.id,
+      slotId: oldSlotId,
+      state: SlotState.free,
+    ));
+    unawaited(_firestore.updateSlotState(
+      lotId: lot.id,
+      slotId: newSlot.id,
+      state: SlotState.taken,
+      reservedBy: _currentUser.id,
+    ));
+
     _logEvent(
       bookingId: updatedBooking.id,
       type: ParkingEventType.accepted,
@@ -701,6 +798,7 @@ class ParkingStateManager extends ChangeNotifier {
       description: 'Vehicle checked in at barrier for slot ${updated.slotId}',
     );
 
+    _stopHoldTimer();
     pauseMovementSimulation();
     notifyListeners();
   }
@@ -708,6 +806,7 @@ class ParkingStateManager extends ChangeNotifier {
   // Cancel Booking (M6 / M8)
   void cancelBooking({bool autoCancelled = false}) {
     if (_currentActiveBooking == null) return;
+    _stopHoldTimer();
     pauseMovementSimulation();
 
     final booking = _currentActiveBooking!;
@@ -741,6 +840,12 @@ class ParkingStateManager extends ChangeNotifier {
     _currentActiveBooking = null;
     _firestore.saveBooking(updated);
 
+    unawaited(_firestore.updateSlotState(
+      lotId: booking.lotId,
+      slotId: booking.slotId,
+      state: SlotState.free,
+    ));
+
     _logEvent(
       bookingId: updated.id,
       type: autoCancelled
@@ -757,6 +862,7 @@ class ParkingStateManager extends ChangeNotifier {
   // Complete Payment & Exit (M11)
   void completePayment(int finalAmount) {
     if (_currentActiveBooking == null) return;
+    _stopHoldTimer();
 
     final booking = _currentActiveBooking!;
     final updated = booking.copyWith(
@@ -789,6 +895,12 @@ class ParkingStateManager extends ChangeNotifier {
     _currentActiveBooking = null;
     _firestore.saveBooking(updated);
 
+    unawaited(_firestore.updateSlotState(
+      lotId: booking.lotId,
+      slotId: booking.slotId,
+      state: SlotState.free,
+    ));
+
     _logEvent(
       bookingId: updated.id,
       type: ParkingEventType.completed,
@@ -796,6 +908,102 @@ class ParkingStateManager extends ChangeNotifier {
     );
 
     pauseMovementSimulation();
+    notifyListeners();
+  }
+
+  // Hold-Time & Auto-Release Control (Option 1)
+  Timer? _holdCountdownTimer;
+
+  bool get _isTestRuntime {
+    try {
+      return !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _startHoldTimer() {
+    _stopHoldTimer();
+    if (_isTestRuntime) return;
+    _holdCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_currentActiveBooking == null ||
+          _currentActiveBooking!.status == BookingStatus.checkedIn ||
+          _currentActiveBooking!.status == BookingStatus.completed ||
+          _currentActiveBooking!.status == BookingStatus.cancelled ||
+          _currentActiveBooking!.status == BookingStatus.autoCancelled) {
+        _stopHoldTimer();
+        return;
+      }
+
+      if (_currentActiveBooking!.isHoldExpired) {
+        _stopHoldTimer();
+        cancelBooking(autoCancelled: true);
+        return;
+      }
+
+      notifyListeners();
+    });
+  }
+
+  void _stopHoldTimer() {
+    _holdCountdownTimer?.cancel();
+    _holdCountdownTimer = null;
+  }
+
+  Duration get remainingHoldDuration {
+    if (_currentActiveBooking == null) return Duration.zero;
+    return _currentActiveBooking!.remainingHoldDuration;
+  }
+
+  void checkAndAutoReleaseExpiredBookings() {
+    if (_currentActiveBooking != null &&
+        (_currentActiveBooking!.status == BookingStatus.reserved ||
+         _currentActiveBooking!.status == BookingStatus.upgraded) &&
+        _currentActiveBooking!.isHoldExpired) {
+      cancelBooking(autoCancelled: true);
+    }
+  }
+
+  /// Fast-forwards the hold deadline to remaining duration (default 10s) for live evaluation testing
+  void fastForwardHoldTimer({Duration remaining = const Duration(seconds: 10)}) {
+    if (_currentActiveBooking == null) return;
+    final updated = _currentActiveBooking!.copyWith(
+      holdExpiresAt: DateTime.now().add(remaining),
+    );
+    final idx = _bookings.indexWhere((b) => b.id == updated.id);
+    if (idx != -1) {
+      _bookings[idx] = updated;
+    }
+    _currentActiveBooking = updated;
+    _firestore.saveBooking(updated);
+    _logEvent(
+      bookingId: updated.id,
+      type: ParkingEventType.booked,
+      description: 'Hold timer accelerated to ${remaining.inSeconds}s (Evaluation Simulation)',
+    );
+    notifyListeners();
+  }
+
+  /// Extends the hold window by the specified duration (default +5m)
+  void extendHoldDuration({Duration extension = const Duration(minutes: 5)}) {
+    if (_currentActiveBooking == null) return;
+    final currentDeadline = _currentActiveBooking!.effectiveHoldDeadline;
+    final updated = _currentActiveBooking!.copyWith(
+      holdExpiresAt: currentDeadline.add(extension),
+      status: BookingStatus.extended,
+      extensionFee: _currentActiveBooking!.extensionFee + 50,
+    );
+    final idx = _bookings.indexWhere((b) => b.id == updated.id);
+    if (idx != -1) {
+      _bookings[idx] = updated;
+    }
+    _currentActiveBooking = updated;
+    _firestore.saveBooking(updated);
+    _logEvent(
+      bookingId: updated.id,
+      type: ParkingEventType.extended,
+      description: 'Hold time extended by ${extension.inMinutes} mins',
+    );
     notifyListeners();
   }
 
@@ -819,6 +1027,7 @@ class ParkingStateManager extends ChangeNotifier {
   @override
   void dispose() {
     _simulationTimer?.cancel();
+    _stopHoldTimer();
     super.dispose();
   }
 }

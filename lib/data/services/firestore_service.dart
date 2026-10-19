@@ -4,6 +4,10 @@ import 'package:flutter/foundation.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/booking_model.dart';
 import '../models/parking_event_model.dart';
+import '../models/parking_lot_model.dart';
+import '../models/parking_slot_model.dart';
+import '../models/user_model.dart';
+import '../models/vehicle_model.dart';
 
 class OtpVerificationResult {
   final bool isValid;
@@ -20,6 +24,7 @@ class FirestoreService {
   FirebaseFirestore? _firestore;
   bool _isAvailable = false;
   final Map<String, Map<String, dynamic>> _localVerifications = {};
+  final Map<String, User> _localUsers = {};
 
   bool get isAvailable => _isAvailable;
 
@@ -43,6 +48,9 @@ class FirestoreService {
 
   CollectionReference<Map<String, dynamic>>? get _lotsRef =>
       _isAvailable ? _firestore!.collection('lots') : null;
+
+  CollectionReference<Map<String, dynamic>>? get _usersRef =>
+      _isAvailable ? _firestore!.collection('users') : null;
 
   CollectionReference<Map<String, dynamic>>? get _verificationsRef =>
       _isAvailable ? _firestore!.collection('email_verifications') : null;
@@ -139,9 +147,68 @@ class FirestoreService {
     });
   }
 
-  // --- Campus Lots & CCTV Camera Occupancy Updates ---
+  // --- Campus Lots & Real-Time Bay Occupancy ---
 
-  /// Streams live lot slot states updated by CCTV vision pipeline (Samudi's module)
+  /// Seeds default campus lots into Firestore if the 'lots' collection is empty
+  Future<void> seedInitialLotsIfEmpty(List<ParkingLot> defaultLots) async {
+    if (!_isAvailable || _lotsRef == null) return;
+    try {
+      final snapshot = await _lotsRef!.limit(1).get().timeout(const Duration(seconds: 2));
+      if (snapshot.docs.isEmpty) {
+        for (final lot in defaultLots) {
+          await _lotsRef!.doc(lot.id).set(lot.toJson());
+        }
+        debugPrint('[FirestoreService] Seeded ${defaultLots.length} campus lots to Firestore');
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] Seed lots error: $e');
+    }
+  }
+
+  /// Updates the occupancy state of a specific parking slot in a lot in Firestore
+  Future<void> updateSlotState({
+    required String lotId,
+    required String slotId,
+    required SlotState state,
+    String? reservedBy,
+  }) async {
+    if (!_isAvailable || _lotsRef == null) return;
+    try {
+      final docRef = _lotsRef!.doc(lotId);
+      final doc = await docRef.get().timeout(const Duration(seconds: 2));
+      if (doc.exists && doc.data() != null) {
+        final lot = ParkingLot.fromJson(doc.data()!);
+        final updatedSlots = lot.slots.map((s) {
+          if (s.id == slotId) {
+            return s.copyWith(state: state);
+          }
+          return s;
+        }).toList();
+        final freeCount = updatedSlots.where((s) => s.state == SlotState.free).length;
+        await docRef.update({
+          'slots': updatedSlots.map((s) => s.toJson()).toList(),
+          'freeSlots': freeCount,
+          'lastUpdated': DateTime.now().toIso8601String(),
+        });
+      }
+    } catch (e) {
+      debugPrint('[FirestoreService] Error updating slot $slotId: $e');
+    }
+  }
+
+  /// Streams real-time campus parking lots and slot states
+  Stream<List<ParkingLot>> streamLots() {
+    if (!_isAvailable || _lotsRef == null) {
+      return const Stream.empty();
+    }
+    return _lotsRef!.snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) => ParkingLot.fromJson(doc.data()))
+          .toList();
+    });
+  }
+
+  /// Streams live lot slot states updated by CCTV vision pipeline
   Stream<Map<String, SlotState>> streamSlotOccupancy(String lotId) {
     if (!_isAvailable || _lotsRef == null) {
       return const Stream.empty();
@@ -149,15 +216,57 @@ class FirestoreService {
     return _lotsRef!.doc(lotId).snapshots().map((doc) {
       final data = doc.data();
       if (data == null || !data.containsKey('slots')) return {};
-      final slotsMap = data['slots'] as Map<String, dynamic>;
+      final slotsList = data['slots'] as List<dynamic>? ?? [];
       final result = <String, SlotState>{};
-      slotsMap.forEach((slotId, stateString) {
-        result[slotId] = (stateString == 'occupied' || stateString == 'taken')
-            ? SlotState.taken
-            : SlotState.free;
-      });
+      for (final s in slotsList) {
+        if (s is Map<String, dynamic>) {
+          final slotId = s['id'] as String? ?? '';
+          final stateString = s['state'] as String? ?? 'free';
+          result[slotId] = (stateString == 'occupied' || stateString == 'taken')
+              ? SlotState.taken
+              : SlotState.free;
+        }
+      }
       return result;
     });
+  }
+
+  // --- Real Driver Profiles & Registered Vehicles ---
+
+  /// Saves or updates a real user profile and vehicle fleet in Firestore
+  Future<void> saveUser(User user) async {
+    final cleanEmail = user.email.trim().toLowerCase();
+    _localUsers[cleanEmail] = user;
+    if (!_isAvailable || _usersRef == null) return;
+    try {
+      await _usersRef!
+          .doc(cleanEmail)
+          .set(user.toJson(), SetOptions(merge: true))
+          .timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('[FirestoreService] Failed to save user $cleanEmail: $e');
+    }
+  }
+
+  /// Fetches an existing user from Firestore, with fallback to local cache
+  Future<User?> fetchUser(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    if (_isAvailable && _usersRef != null) {
+      try {
+        final doc = await _usersRef!
+            .doc(cleanEmail)
+            .get()
+            .timeout(const Duration(milliseconds: 1500));
+        if (doc.exists && doc.data() != null) {
+          final user = User.fromJson(doc.data()!);
+          _localUsers[cleanEmail] = user;
+          return user;
+        }
+      } catch (e) {
+        debugPrint('[FirestoreService] Firestore get user timeout: $e');
+      }
+    }
+    return _localUsers[cleanEmail];
   }
 
   // --- Email OTP Verification Collection (M1) ---

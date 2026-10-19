@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/hold_countdown_timer_widget.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/services/parking_state_manager.dart';
 import 'booking_detail_modal.dart';
@@ -259,6 +260,12 @@ class _ActiveBookingCard extends StatelessWidget {
                 ),
               ],
             ),
+
+            if (booking.status == BookingStatus.reserved ||
+                booking.status == BookingStatus.upgraded) ...[
+              const SizedBox(height: AppSpace.md),
+              HoldCountdownTimerWidget(booking: booking, compact: true),
+            ],
 
             const SizedBox(height: AppSpace.md),
             const Divider(),
