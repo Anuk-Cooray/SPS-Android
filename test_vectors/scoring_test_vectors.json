@@ -100,7 +100,7 @@
   },
   {
     "id": "vector_04_high_demand_penalty",
-    "description": "Lot at 90% occupancy applies high demand penalty (22.5)",
+    "description": "Lot at 90% occupancy with entrance slot applying peak turnover penalty (1.2x demand)",
     "slot": {
       "id": "A-03",
       "row": "A",
@@ -126,9 +126,9 @@
       "isEligible": true,
       "distanceScore": 80.0,
       "sizeFitScore": 100.0,
-      "preferenceScore": 85.0,
-      "demandPenalty": 22.5,
-      "totalScore": 70.625
+      "preferenceScore": 50.0,
+      "demandPenalty": 27.0,
+      "totalScore": 62.95
     }
   },
   {
@@ -166,7 +166,7 @@
   },
   {
     "id": "vector_06_far_walking_distance_clamped",
-    "description": "Slot beyond 250m threshold (300m) clamps distance score to 0",
+    "description": "Slot beyond 250m threshold (300m) clamps distance score to 0 with deep perimeter turnover relief (0.8x)",
     "slot": {
       "id": "E-20",
       "row": "E",
@@ -193,8 +193,8 @@
       "distanceScore": 0.0,
       "sizeFitScore": 100.0,
       "preferenceScore": 50.0,
-      "demandPenalty": 12.5,
-      "totalScore": 33.125
+      "demandPenalty": 10.0,
+      "totalScore": 33.5
     }
   },
   {

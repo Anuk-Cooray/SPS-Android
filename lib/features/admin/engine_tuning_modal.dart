@@ -27,7 +27,7 @@ class _EngineTuningModalState extends State<EngineTuningModal> {
   late double _prefWeight;
   late double _demandWeight;
   late double _minImprovementMeters;
-  late double _minScorePercent;
+  late double _minScorePoints;
   late double _offerTimeoutSec;
   late double _triggerEtaMinutes;
 
@@ -40,7 +40,7 @@ class _EngineTuningModalState extends State<EngineTuningModal> {
     _prefWeight = weights.preferenceWeight;
     _demandWeight = weights.demandWeight;
     _minImprovementMeters = weights.minImprovementMeters.toDouble();
-    _minScorePercent = weights.minScoreImprovementPercent;
+    _minScorePoints = weights.minScoreImprovementPoints;
     _offerTimeoutSec = weights.offerTimeoutSeconds.toDouble();
     _triggerEtaMinutes = weights.upgradeTriggerEtaMinutes.toDouble();
   }
@@ -53,7 +53,7 @@ class _EngineTuningModalState extends State<EngineTuningModal> {
       _prefWeight = d.preferenceWeight;
       _demandWeight = d.demandWeight;
       _minImprovementMeters = d.minImprovementMeters.toDouble();
-      _minScorePercent = d.minScoreImprovementPercent;
+      _minScorePoints = d.minScoreImprovementPoints;
       _offerTimeoutSec = d.offerTimeoutSeconds.toDouble();
       _triggerEtaMinutes = d.upgradeTriggerEtaMinutes.toDouble();
     });
@@ -66,7 +66,7 @@ class _EngineTuningModalState extends State<EngineTuningModal> {
       preferenceWeight: _prefWeight,
       demandWeight: _demandWeight,
       minImprovementMeters: _minImprovementMeters.toInt(),
-      minScoreImprovementPercent: _minScorePercent,
+      minScoreImprovementPoints: _minScorePoints,
       offerTimeoutSeconds: _offerTimeoutSec.toInt(),
       upgradeTriggerEtaMinutes: _triggerEtaMinutes.toInt(),
     );
@@ -243,12 +243,12 @@ class _EngineTuningModalState extends State<EngineTuningModal> {
 
               _buildSlider(
                 title: 'Min Score Improvement (ΔS)',
-                value: _minScorePercent,
+                value: _minScorePoints,
                 min: 5,
                 max: 40,
                 divisions: 7,
-                unit: '%',
-                onChanged: (v) => setState(() => _minScorePercent = v),
+                unit: ' pts',
+                onChanged: (v) => setState(() => _minScorePoints = v),
                 c: c,
               ),
 

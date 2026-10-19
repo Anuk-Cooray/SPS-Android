@@ -5,7 +5,7 @@ class UpgradeEvaluationResult {
   final SlotScoreResult currentSlotScore;
   final SlotScoreResult? candidateSlotScore;
   final int distanceSavedMeters;
-  final double scoreImprovementPercent;
+  final double scoreImprovementPoints;
   final String decisionReason;
   final DateTime evaluatedAt;
 
@@ -14,10 +14,13 @@ class UpgradeEvaluationResult {
     required this.currentSlotScore,
     this.candidateSlotScore,
     this.distanceSavedMeters = 0,
-    this.scoreImprovementPercent = 0.0,
+    this.scoreImprovementPoints = 0.0,
     required this.decisionReason,
     required this.evaluatedAt,
   });
+
+  @Deprecated('Use scoreImprovementPoints instead')
+  double get scoreImprovementPercent => scoreImprovementPoints;
 
   Map<String, dynamic> toTelemetryMap() => {
         'timestamp': evaluatedAt.toIso8601String(),
@@ -27,7 +30,8 @@ class UpgradeEvaluationResult {
         'candidateSlot': candidateSlotScore?.slot.id ?? 'none',
         'candidateScore': candidateSlotScore?.totalScore.toStringAsFixed(2) ?? '0.00',
         'distanceSavedMeters': distanceSavedMeters,
-        'scoreImprovementPercent': scoreImprovementPercent.toStringAsFixed(1),
+        'scoreImprovementPoints': scoreImprovementPoints.toStringAsFixed(1),
+        'scoreImprovementPercent': scoreImprovementPoints.toStringAsFixed(1),
         'decisionReason': decisionReason,
       };
 }

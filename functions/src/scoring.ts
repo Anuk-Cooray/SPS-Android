@@ -44,7 +44,8 @@ export interface ScoringWeights {
   preferenceWeight: number; // w_pref (0.20)
   demandWeight: number; // w_demand (0.15)
   minImprovementMeters: number; // 50m
-  minScoreImprovementPercent: number; // 20%
+  minScoreImprovementPoints: number; // 20.0 points
+  minScoreImprovementPercent?: number; // legacy alias
   upgradeTriggerEtaMinutes: number; // 10 min
   offerTimeoutSeconds: number; // 60s
 }
@@ -55,6 +56,7 @@ export const DEFAULT_SCORING_WEIGHTS: ScoringWeights = {
   preferenceWeight: 0.20,
   demandWeight: 0.15,
   minImprovementMeters: 50,
+  minScoreImprovementPoints: 20.0,
   minScoreImprovementPercent: 20.0,
   upgradeTriggerEtaMinutes: 10,
   offerTimeoutSeconds: 60,
@@ -76,7 +78,8 @@ export interface UpgradeEvaluationResult {
   currentSlotScore: SlotScoreResult;
   candidateSlotScore?: SlotScoreResult;
   distanceSavedMeters?: number;
-  scoreImprovementPercent?: number;
+  scoreImprovementPoints?: number;
+  scoreImprovementPercent?: number; // legacy alias
   decisionReason: string;
   evaluatedAt: Date;
 }
@@ -136,24 +139,30 @@ export function scoreSlot(
   }
 
   // 4. User Preference Score (0 - 100)
-  let preferenceScore = 50.0; // baseline
-  if (preferences.preferNearEntrance && slot.walkingDistanceMeters <= 50) {
-    preferenceScore += 35.0;
-  }
+  // Non-distance categorical preferences (avoids double-counting with distanceScore)
+  let preferenceScore = 50.0; // baseline neutral
   if (preferences.coveredParkingOnly) {
     if (slot.type === 'covered') {
-      preferenceScore += 15.0;
+      preferenceScore = 100.0;
     } else {
-      preferenceScore = Math.max(0.0, preferenceScore - 40.0);
+      preferenceScore = 10.0;
     }
   }
   preferenceScore = clamp(preferenceScore, 0.0, 100.0);
 
-  // 5. Lot Demand Factor (0 - 100)
+  // 5. Lot Demand Factor (0 - 100) — Slot-aware demand penalty
   const occupancyRate = lot.totalSlots > 0
     ? (lot.totalSlots - lot.freeSlots) / lot.totalSlots
     : 0.0;
-  const demandPenalty = clamp(occupancyRate * 25.0, 0.0, 100.0);
+
+  let turnoverMultiplier = 1.0;
+  if (occupancyRate >= 0.70 && slot.walkingDistanceMeters <= 50) {
+    turnoverMultiplier = 1.20; // High-turnover entrance zone during peak demand
+  } else if (slot.walkingDistanceMeters > 150) {
+    turnoverMultiplier = 0.80; // Deep perimeter zone
+  }
+
+  const demandPenalty = clamp(occupancyRate * 25.0 * turnoverMultiplier, 0.0, 100.0);
 
   // 6. Weighted Sum (SYS-01)
   const weightedTotal =
@@ -255,12 +264,10 @@ export function evaluateInTransitUpgrade(
 
   const distanceSaved = currentSlot.walkingDistanceMeters - bestCandidate.slot.walkingDistanceMeters;
   const scoreDelta = bestCandidate.totalScore - currentScore.totalScore;
-  const improvementPercent = currentScore.totalScore > 0
-    ? (scoreDelta / currentScore.totalScore) * 100.0
-    : 0.0;
+  const thresholdPoints = weights.minScoreImprovementPoints ?? weights.minScoreImprovementPercent ?? 20.0;
 
   const meetsDistance = distanceSaved >= weights.minImprovementMeters;
-  const meetsScore = improvementPercent >= weights.minScoreImprovementPercent;
+  const meetsScore = scoreDelta >= thresholdPoints;
 
   if (meetsDistance && meetsScore) {
     return {
@@ -268,8 +275,9 @@ export function evaluateInTransitUpgrade(
       currentSlotScore: currentScore,
       candidateSlotScore: bestCandidate,
       distanceSavedMeters: distanceSaved,
-      scoreImprovementPercent: improvementPercent,
-      decisionReason: `Found superior slot ${bestCandidate.slot.id}: Saves ${distanceSaved}m walking (Score improved +${improvementPercent.toFixed(1)}%).`,
+      scoreImprovementPoints: scoreDelta,
+      scoreImprovementPercent: scoreDelta,
+      decisionReason: `Found superior slot ${bestCandidate.slot.id}: Saves ${distanceSaved}m walking (Score improved +${scoreDelta.toFixed(1)} points).`,
       evaluatedAt,
     };
   }
@@ -279,8 +287,9 @@ export function evaluateInTransitUpgrade(
     currentSlotScore: currentScore,
     candidateSlotScore: bestCandidate,
     distanceSavedMeters: distanceSaved,
-    scoreImprovementPercent: improvementPercent,
-    decisionReason: `Best candidate ${bestCandidate.slot.id} did not exceed threshold (Saves ${distanceSaved}m / req: ${weights.minImprovementMeters}m, Score: +${improvementPercent.toFixed(1)}% / req: ${weights.minScoreImprovementPercent}%).`,
+    scoreImprovementPoints: scoreDelta,
+    scoreImprovementPercent: scoreDelta,
+    decisionReason: `Best candidate ${bestCandidate.slot.id} did not exceed threshold (Saves ${distanceSaved}m / req: ${weights.minImprovementMeters}m, Score: +${scoreDelta.toFixed(1)} pts / req: ${thresholdPoints} pts).`,
     evaluatedAt,
   };
 }

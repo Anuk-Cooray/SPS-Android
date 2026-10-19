@@ -78,7 +78,7 @@ class _UpgradeOfferModalState extends State<UpgradeOfferModal> {
     final newSlotId = widget.newSlot.id;
     final distanceSaved = widget.evaluationResult?.distanceSavedMeters ??
         (160 - widget.newSlot.walkingDistanceMeters).clamp(10, 500);
-    final scoreImprovement = widget.evaluationResult?.scoreImprovementPercent;
+    final scoreImprovement = widget.evaluationResult?.scoreImprovementPoints;
     final currentWalk = widget.newSlot.walkingDistanceMeters + distanceSaved;
 
     return Container(
@@ -155,7 +155,7 @@ class _UpgradeOfferModalState extends State<UpgradeOfferModal> {
 
           // Subtitle
           Text(
-            'A closer slot just opened in ${widget.booking.lotName}. Same price, same arrival time.${scoreImprovement != null ? ' Match score improved +${scoreImprovement.toStringAsFixed(1)}%.' : ''}',
+            'A closer slot just opened in ${widget.booking.lotName}. Same price, same arrival time.${scoreImprovement != null ? ' Match score improved +${scoreImprovement.toStringAsFixed(1)} pts.' : ''}',
             style: AppText.body.copyWith(color: c.textSecondary),
           ),
 
@@ -221,7 +221,7 @@ class _UpgradeOfferModalState extends State<UpgradeOfferModal> {
                           ),
                           if (scoreImprovement != null && scoreImprovement > 0)
                             Text(
-                              '+${scoreImprovement.toStringAsFixed(0)}%',
+                              '+${scoreImprovement.toStringAsFixed(0)} pts',
                               style: AppText.caption.copyWith(
                                 color: c.accent,
                                 fontWeight: FontWeight.w700,

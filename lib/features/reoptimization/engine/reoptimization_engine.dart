@@ -57,25 +57,32 @@ class ReoptimizationEngine implements ReoptimizationService {
     }
 
     // 4. User Preference Score (0 - 100)
-    double preferenceScore = 50.0; // baseline
-    if (preferences.preferNearEntrance && slot.walkingDistanceMeters <= 50) {
-      preferenceScore += 35.0;
-    }
+    // Non-distance categorical preferences (avoids double-counting with distanceScore)
+    double preferenceScore = 50.0; // baseline neutral
     if (preferences.coveredParkingOnly) {
       if (slot.type == SlotType.covered) {
-        preferenceScore += 15.0;
+        preferenceScore = 100.0;
       } else {
-        preferenceScore = max(0.0, preferenceScore - 40.0);
+        preferenceScore = 10.0;
       }
     }
     preferenceScore = preferenceScore.clamp(0.0, 100.0);
 
-    // 5. Lot Demand Factor (0 - 100)
-    // High occupancy slightly penalizes top premium entrance slots to prevent bottlenecks
+    // 5. Lot Demand Factor (0 - 100) — Slot-aware demand penalty
+    // High occupancy penalizes high-turnover entrance slots during peak load
     final double occupancyRate = lot.totalSlots > 0
         ? (lot.totalSlots - lot.freeSlots) / lot.totalSlots
         : 0.0;
-    final double demandPenalty = (occupancyRate * 25.0).clamp(0.0, 100.0);
+
+    double turnoverMultiplier = 1.0;
+    if (occupancyRate >= 0.70 && slot.walkingDistanceMeters <= 50) {
+      turnoverMultiplier = 1.20; // High-turnover entrance zone during peak demand
+    } else if (slot.walkingDistanceMeters > 150) {
+      turnoverMultiplier = 0.80; // Deep perimeter zone
+    }
+
+    final double demandPenalty =
+        (occupancyRate * 25.0 * turnoverMultiplier).clamp(0.0, 100.0);
 
     // 6. Weighted Sum (SYS-01)
     final double weightedTotal = (weights.distanceWeight * distanceScore) +
@@ -224,14 +231,11 @@ class ReoptimizationEngine implements ReoptimizationService {
     // Condition 3: Minimum distance improvement threshold (e.g. saves >= 50m)
     final int distanceSaved = currentSlot.walkingDistanceMeters - bestCandidate.slot.walkingDistanceMeters;
 
-    // Condition 4: Minimum score improvement threshold (e.g. >= 20%)
+    // Condition 4: Minimum score improvement threshold (e.g. >= 20.0 score points)
     final double scoreDelta = bestCandidate.totalScore - currentScore.totalScore;
-    final double improvementPercent = currentScore.totalScore > 0
-        ? (scoreDelta / currentScore.totalScore) * 100.0
-        : 0.0;
 
     final bool meetsDistance = distanceSaved >= weights.minImprovementMeters;
-    final bool meetsScore = improvementPercent >= weights.minScoreImprovementPercent;
+    final bool meetsScore = scoreDelta >= weights.minScoreImprovementPoints;
 
     if (meetsDistance && meetsScore) {
       return UpgradeEvaluationResult(
@@ -239,9 +243,9 @@ class ReoptimizationEngine implements ReoptimizationService {
         currentSlotScore: currentScore,
         candidateSlotScore: bestCandidate,
         distanceSavedMeters: distanceSaved,
-        scoreImprovementPercent: improvementPercent,
+        scoreImprovementPoints: scoreDelta,
         decisionReason: 'Found superior slot ${bestCandidate.slot.id}: Saves $distanceSaved m walking '
-            '(Score improved +${improvementPercent.toStringAsFixed(1)}%).',
+            '(Score improved +${scoreDelta.toStringAsFixed(1)} points).',
         evaluatedAt: evaluatedAt,
       );
     }
@@ -251,10 +255,10 @@ class ReoptimizationEngine implements ReoptimizationService {
       currentSlotScore: currentScore,
       candidateSlotScore: bestCandidate,
       distanceSavedMeters: distanceSaved,
-      scoreImprovementPercent: improvementPercent,
+      scoreImprovementPoints: scoreDelta,
       decisionReason: 'Best candidate ${bestCandidate.slot.id} did not exceed threshold '
           '(Saves ${distanceSaved}m / req: ${weights.minImprovementMeters}m, '
-          'Score: +${improvementPercent.toStringAsFixed(1)}% / req: ${weights.minScoreImprovementPercent}%).',
+          'Score: +${scoreDelta.toStringAsFixed(1)} pts / req: ${weights.minScoreImprovementPoints} pts).',
       evaluatedAt: evaluatedAt,
     );
   }

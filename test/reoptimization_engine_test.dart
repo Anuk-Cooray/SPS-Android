@@ -122,25 +122,51 @@ void main() {
       expect(score.totalScore, equals(0.0));
     });
 
-    test('Driver near entrance preference grants positive bonus', () {
-      final slotClose = testLot.slots[0]; // 40m <= 50m entrance threshold
+    test('Driver covered parking preference grants positive bonus for covered slot', () {
+      final slotCovered = testLot.slots[0].copyWith(type: SlotType.covered);
 
       final withPref = engine.scoreSlot(
-        slot: slotClose,
+        slot: slotCovered,
         lot: testLot,
         vehicle: sedanVehicle,
-        preferences: const UserPreferences(preferNearEntrance: true),
+        preferences: const UserPreferences(coveredParkingOnly: true),
       );
 
       final withoutPref = engine.scoreSlot(
-        slot: slotClose,
+        slot: slotCovered,
         lot: testLot,
         vehicle: sedanVehicle,
-        preferences: const UserPreferences(preferNearEntrance: false),
+        preferences: const UserPreferences(coveredParkingOnly: false),
       );
 
       expect(withPref.preferenceScore, greaterThan(withoutPref.preferenceScore));
       expect(withPref.totalScore, greaterThan(withoutPref.totalScore));
+    });
+
+    test('Slot-aware turnover penalty applies higher penalty to entrance bays during peak demand', () {
+      final entranceSlot = testLot.slots[0]; // 40m
+      final perimeterSlot = testLot.slots[1]; // 160m
+
+      final busyLot = testLot.copyWith(totalSlots: 100, freeSlots: 10); // 90% occupancy >= 70%
+
+      final scoreEntrance = engine.scoreSlot(
+        slot: entranceSlot,
+        lot: busyLot,
+        vehicle: sedanVehicle,
+        preferences: const UserPreferences(),
+      );
+
+      final scorePerimeter = engine.scoreSlot(
+        slot: perimeterSlot,
+        lot: busyLot,
+        vehicle: sedanVehicle,
+        preferences: const UserPreferences(),
+      );
+
+      // Entrance (<=50m) gets 1.20 turnover multiplier (27.0 penalty)
+      // Perimeter (>150m) gets 0.80 turnover multiplier (18.0 penalty)
+      expect(scoreEntrance.demandPenalty, equals(27.0));
+      expect(scorePerimeter.demandPenalty, equals(18.0));
     });
 
     test('Rank and recommendation picks highest scoring available slot', () {
@@ -186,7 +212,7 @@ void main() {
             number: 1,
             state: SlotState.free,
             size: VehicleSize.medium,
-            walkingDistanceMeters: 40,
+            walkingDistanceMeters: 20,
           ),
           ParkingSlot(
             id: 'A-02',
@@ -195,14 +221,14 @@ void main() {
             number: 2,
             state: SlotState.taken,
             size: VehicleSize.medium,
-            walkingDistanceMeters: 160,
+            walkingDistanceMeters: 180,
           ),
         ],
       );
     });
 
     test('Suppresses upgrade if user opted out in preferences', () {
-      final currentSlot = testLot.slots[1]; // A-02 (160m)
+      final currentSlot = testLot.slots[1]; // A-02 (180m)
 
       final eval = engine.evaluateInTransitUpgrade(
         lot: testLot,
@@ -217,7 +243,7 @@ void main() {
     });
 
     test('Suppresses upgrade if ETA is outside trigger window (> 10 min)', () {
-      final currentSlot = testLot.slots[1]; // A-02 (160m)
+      final currentSlot = testLot.slots[1]; // A-02 (180m)
 
       final eval = engine.evaluateInTransitUpgrade(
         lot: testLot,
@@ -231,9 +257,9 @@ void main() {
       expect(eval.decisionReason, contains('outside upgrade window'));
     });
 
-    test('Offers upgrade when closer candidate saves >= 50m and improves score >= 20%', () {
-      final currentSlot = testLot.slots[1]; // A-02 (160m)
-      // A-01 is free (40m) -> saves 120m (>= 50m) and significantly improves score
+    test('Offers upgrade when closer candidate saves >= 50m and improves score >= 20.0 points', () {
+      final currentSlot = testLot.slots[1]; // A-02 (180m)
+      // A-01 is free (20m) -> saves 160m (>= 50m) and significantly improves score points
 
       final eval = engine.evaluateInTransitUpgrade(
         lot: testLot,
@@ -245,8 +271,9 @@ void main() {
 
       expect(eval.isUpgradeOffered, isTrue);
       expect(eval.candidateSlotScore?.slot.id, equals('A-01'));
-      expect(eval.distanceSavedMeters, equals(120));
-      expect(eval.scoreImprovementPercent, greaterThanOrEqualTo(20.0));
+      expect(eval.distanceSavedMeters, equals(160));
+      expect(eval.scoreImprovementPoints, greaterThanOrEqualTo(20.0));
+      expect(eval.scoreImprovementPercent, greaterThanOrEqualTo(20.0)); // legacy getter parity
     });
 
     test('ExecuteSlotSwap updates booking status to upgraded with qrToken and distance saved', () async {
@@ -275,7 +302,7 @@ void main() {
       expect(swapped.slotId, equals('A-01'));
       expect(swapped.originalSlotId, equals('A-02'));
       expect(swapped.status, equals(BookingStatus.upgraded));
-      expect(swapped.distanceSavedMeters, equals(120));
+      expect(swapped.distanceSavedMeters, equals(140));
       expect(swapped.qrToken, startsWith('QR-UPGRADED-A-01'));
     });
   });

@@ -5,7 +5,7 @@ class ScoringWeights {
   final double demandWeight; // w_demand (default 0.15)
 
   final int minImprovementMeters; // minimum walking distance saved (e.g. 50m)
-  final double minScoreImprovementPercent; // minimum score delta (e.g. 20%)
+  final double minScoreImprovementPoints; // minimum score delta (e.g. 20.0 points)
   final int upgradeTriggerEtaMinutes; // trigger when ETA <= 10 min
   final int offerTimeoutSeconds; // hold window (default 60s)
 
@@ -15,10 +15,15 @@ class ScoringWeights {
     this.preferenceWeight = 0.20,
     this.demandWeight = 0.15,
     this.minImprovementMeters = 50,
-    this.minScoreImprovementPercent = 20.0,
+    double? minScoreImprovementPoints,
+    @Deprecated('Use minScoreImprovementPoints instead')
+    double? minScoreImprovementPercent,
     this.upgradeTriggerEtaMinutes = 10,
     this.offerTimeoutSeconds = 60,
-  });
+  }) : minScoreImprovementPoints = minScoreImprovementPoints ?? minScoreImprovementPercent ?? 20.0;
+
+  @Deprecated('Use minScoreImprovementPoints instead')
+  double get minScoreImprovementPercent => minScoreImprovementPoints;
 
   ScoringWeights copyWith({
     double? distanceWeight,
@@ -26,6 +31,8 @@ class ScoringWeights {
     double? preferenceWeight,
     double? demandWeight,
     int? minImprovementMeters,
+    double? minScoreImprovementPoints,
+    @Deprecated('Use minScoreImprovementPoints instead')
     double? minScoreImprovementPercent,
     int? upgradeTriggerEtaMinutes,
     int? offerTimeoutSeconds,
@@ -36,8 +43,9 @@ class ScoringWeights {
       preferenceWeight: preferenceWeight ?? this.preferenceWeight,
       demandWeight: demandWeight ?? this.demandWeight,
       minImprovementMeters: minImprovementMeters ?? this.minImprovementMeters,
-      minScoreImprovementPercent:
-          minScoreImprovementPercent ?? this.minScoreImprovementPercent,
+      minScoreImprovementPoints: minScoreImprovementPoints ??
+          minScoreImprovementPercent ??
+          this.minScoreImprovementPoints,
       upgradeTriggerEtaMinutes:
           upgradeTriggerEtaMinutes ?? this.upgradeTriggerEtaMinutes,
       offerTimeoutSeconds: offerTimeoutSeconds ?? this.offerTimeoutSeconds,
@@ -50,7 +58,8 @@ class ScoringWeights {
         'preferenceWeight': preferenceWeight,
         'demandWeight': demandWeight,
         'minImprovementMeters': minImprovementMeters,
-        'minScoreImprovementPercent': minScoreImprovementPercent,
+        'minScoreImprovementPoints': minScoreImprovementPoints,
+        'minScoreImprovementPercent': minScoreImprovementPoints,
         'upgradeTriggerEtaMinutes': upgradeTriggerEtaMinutes,
         'offerTimeoutSeconds': offerTimeoutSeconds,
       };
@@ -63,8 +72,10 @@ class ScoringWeights {
         demandWeight: (json['demandWeight'] as num?)?.toDouble() ?? 0.15,
         minImprovementMeters:
             (json['minImprovementMeters'] as num?)?.toInt() ?? 50,
-        minScoreImprovementPercent:
-            (json['minScoreImprovementPercent'] as num?)?.toDouble() ?? 20.0,
+        minScoreImprovementPoints:
+            (json['minScoreImprovementPoints'] as num?)?.toDouble() ??
+                (json['minScoreImprovementPercent'] as num?)?.toDouble() ??
+                20.0,
         upgradeTriggerEtaMinutes:
             (json['upgradeTriggerEtaMinutes'] as num?)?.toInt() ?? 10,
         offerTimeoutSeconds:
