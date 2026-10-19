@@ -9,6 +9,7 @@ import '../../features/reoptimization/engine/reoptimization_engine.dart';
 import '../../features/reoptimization/engine/scoring_weights.dart';
 import '../../features/reoptimization/engine/slot_score_result.dart';
 import '../../features/reoptimization/engine/upgrade_evaluation_result.dart';
+import '../models/admin_alert_model.dart';
 import '../models/booking_model.dart';
 import '../models/parking_event_model.dart';
 import '../models/parking_lot_model.dart';
@@ -1266,6 +1267,64 @@ class ParkingStateManager extends ChangeNotifier {
     );
     _events.insert(0, event);
     _persistBookings();
+  }
+
+  // --- Subsystem Hardware Integrations & Simulation (SYS-09) ---
+
+  Stream<List<AdminAlert>> streamAdminAlerts({String? lotId}) {
+    return _firestore.streamAdminAlerts(lotId: lotId);
+  }
+
+  Future<Map<String, dynamic>> simulateCctvReading({
+    required String lotId,
+    required String slotId,
+    required bool occupied,
+    double confidence = 0.95,
+    DateTime? timestamp,
+    bool? violation,
+    String cameraApiKey = 'cctv-secret-key-cam-01',
+  }) async {
+    return await _firestore.ingestOccupancy(
+      lotId: lotId,
+      slotId: slotId,
+      occupied: occupied,
+      confidence: confidence,
+      timestamp: timestamp,
+      violation: violation,
+      cameraApiKey: cameraApiKey,
+    );
+  }
+
+  Future<Map<String, dynamic>> simulateBarrierValidation({
+    required String qrToken,
+    required String barrierId,
+    int? actualTravelMin,
+    String barrierApiKey = 'barrier-secret-key-gate-01',
+  }) async {
+    return await _firestore.validateBarrierQr(
+      qrToken: qrToken,
+      barrierId: barrierId,
+      actualTravelMin: actualTravelMin,
+      barrierApiKey: barrierApiKey,
+    );
+  }
+
+  Future<Map<String, dynamic>> simulatePaymentSettlement({
+    required String bookingId,
+    required String paymentRef,
+    required int amountPaid,
+    String paymentMethod = 'card',
+    DateTime? timestamp,
+    String paymentApiKey = 'payment-secret-key-svc-01',
+  }) async {
+    return await _firestore.submitPaymentCompleted(
+      bookingId: bookingId,
+      paymentRef: paymentRef,
+      amountPaid: amountPaid,
+      paymentMethod: paymentMethod,
+      timestamp: timestamp,
+      paymentApiKey: paymentApiKey,
+    );
   }
 
   @override

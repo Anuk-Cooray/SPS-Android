@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../../core/theme/app_theme.dart';
+import '../models/admin_alert_model.dart';
 import '../models/booking_model.dart';
 import '../models/parking_event_model.dart';
 import '../models/parking_lot_model.dart';
@@ -74,6 +75,9 @@ class FirestoreService {
 
   CollectionReference<Map<String, dynamic>>? get _tripTelemetryRef =>
       _isAvailable ? _firestore!.collection('trip_telemetry') : null;
+
+  CollectionReference<Map<String, dynamic>>? get _adminAlertsRef =>
+      _isAvailable ? _firestore!.collection('admin_alerts') : null;
 
   // --- Cloud Functions Callable Invocations (Server Reservation Authority) ---
 
@@ -574,4 +578,88 @@ class FirestoreService {
 
     return const OtpVerificationResult(isValid: true);
   }
+
+  // --- Subsystem Hardware Integration Endpoints (CCTV, Barrier, Payment) ---
+
+  /// Stream of system & hardware alerts for admin monitoring
+  Stream<List<AdminAlert>> streamAdminAlerts({String? lotId}) {
+    if (!_isAvailable || _adminAlertsRef == null) {
+      return Stream.value([]);
+    }
+    Query<Map<String, dynamic>> query = _adminAlertsRef!.orderBy('timestamp', descending: true);
+    if (lotId != null && lotId.isNotEmpty) {
+      query = query.where('lotId', isEqualTo: lotId);
+    }
+    return query.snapshots().map((snap) => snap.docs
+        .map((doc) => AdminAlert.fromJson({'id': doc.id, ...doc.data()}))
+        .toList());
+  }
+
+  /// Ingest CCTV camera vision reading (POST /ingestOccupancy)
+  Future<Map<String, dynamic>> ingestOccupancy({
+    required String lotId,
+    required String slotId,
+    required bool occupied,
+    double confidence = 0.95,
+    DateTime? timestamp,
+    bool? violation,
+    String cameraApiKey = 'cctv-secret-key-cam-01',
+  }) async {
+    final payload = {
+      'lotId': lotId,
+      'slotId': slotId,
+      'occupied': occupied,
+      'confidence': confidence,
+      'timestamp': (timestamp ?? DateTime.now()).toIso8601String(),
+      'violation': ?violation,
+    };
+    return await _functions.postRaw(
+      'ingestOccupancy',
+      payload,
+      customHeaders: {'X-Camera-Api-Key': cameraApiKey},
+    );
+  }
+
+  /// Validate signed QR token at IoT Barrier Gate (POST /validateQr)
+  Future<Map<String, dynamic>> validateBarrierQr({
+    required String qrToken,
+    required String barrierId,
+    int? actualTravelMin,
+    String barrierApiKey = 'barrier-secret-key-gate-01',
+  }) async {
+    final payload = {
+      'qrToken': qrToken,
+      'barrierId': barrierId,
+      'actualTravelMin': ?actualTravelMin,
+    };
+    return await _functions.postRaw(
+      'validateQr',
+      payload,
+      customHeaders: {'X-Device-Api-Key': barrierApiKey},
+    );
+  }
+
+  /// Finalize payment and release parking bay (POST /paymentCompleted)
+  Future<Map<String, dynamic>> submitPaymentCompleted({
+    required String bookingId,
+    required String paymentRef,
+    required int amountPaid,
+    String paymentMethod = 'card',
+    DateTime? timestamp,
+    String paymentApiKey = 'payment-secret-key-svc-01',
+  }) async {
+    final payload = {
+      'bookingId': bookingId,
+      'paymentRef': paymentRef,
+      'amountPaid': amountPaid,
+      'paymentMethod': paymentMethod,
+      'timestamp': (timestamp ?? DateTime.now()).toIso8601String(),
+    };
+    return await _functions.postRaw(
+      'paymentCompleted',
+      payload,
+      customHeaders: {'X-Service-Api-Key': paymentApiKey},
+    );
+  }
 }
+

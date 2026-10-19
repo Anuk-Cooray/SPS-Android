@@ -1,0 +1,222 @@
+{
+  "info": {
+    "_postman_id": "7f8b9a10-2345-4cde-8901-abcdef123456",
+    "name": "Smart Parking System (SPS) - Hardware Integration APIs",
+    "description": "Integration endpoints for CCTV Occupancy, IoT Barrier Gate, and Payment Gateway components (J26-IT-335).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:5001/sps-android/us-central1",
+      "type": "string"
+    },
+    {
+      "key": "cctvApiKey",
+      "value": "cctv-secret-key-cam-01",
+      "type": "string"
+    },
+    {
+      "key": "barrierApiKey",
+      "value": "barrier-secret-key-gate-01",
+      "type": "string"
+    },
+    {
+      "key": "paymentApiKey",
+      "value": "payment-secret-key-svc-01",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. CCTV Occupancy",
+      "item": [
+        {
+          "name": "Ingest Occupancy - Slot Occupied",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Camera-Api-Key",
+                "value": "{{cctvApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lotId\": \"lot-main\",\n  \"slotId\": \"A-01\",\n  \"occupied\": true,\n  \"confidence\": 0.95,\n  \"timestamp\": \"2026-10-19T14:30:00.000Z\",\n  \"violation\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ingestOccupancy",
+              "host": ["{{baseUrl}}"],
+              "path": ["ingestOccupancy"]
+            }
+          }
+        },
+        {
+          "name": "Ingest Occupancy - Slot Available",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Camera-Api-Key",
+                "value": "{{cctvApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lotId\": \"lot-main\",\n  \"slotId\": \"A-01\",\n  \"occupied\": false,\n  \"confidence\": 0.92,\n  \"timestamp\": \"2026-10-19T14:35:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ingestOccupancy",
+              "host": ["{{baseUrl}}"],
+              "path": ["ingestOccupancy"]
+            }
+          }
+        },
+        {
+          "name": "Ingest Occupancy - Unauthorized Conflict Simulation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Camera-Api-Key",
+                "value": "{{cctvApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lotId\": \"lot-main\",\n  \"slotId\": \"A-02\",\n  \"occupied\": true,\n  \"confidence\": 0.98,\n  \"timestamp\": \"2026-10-19T14:31:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ingestOccupancy",
+              "host": ["{{baseUrl}}"],
+              "path": ["ingestOccupancy"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. IoT Barrier Gate",
+      "item": [
+        {
+          "name": "Validate QR Token at Entry Barrier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Device-Api-Key",
+                "value": "{{barrierApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrToken\": \"SPS.v1.BK-TEST-001.A-01.1792420000.1792429000.abc123.validSignatureHash\",\n  \"barrierId\": \"barrier-gate-entry-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/validateQr",
+              "host": ["{{baseUrl}}"],
+              "path": ["validateQr"]
+            }
+          }
+        },
+        {
+          "name": "Validate QR Token - Wrong Slot Rejection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Device-Api-Key",
+                "value": "{{barrierApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrToken\": \"SPS.v1.BK-TEST-001.B-05.1792420000.1792429000.abc123.validSignatureHash\",\n  \"barrierId\": \"barrier-gate-bay-A01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/validateQr",
+              "host": ["{{baseUrl}}"],
+              "path": ["validateQr"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Payment & Settlement",
+      "item": [
+        {
+          "name": "Complete Payment & Free Slot",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Service-Api-Key",
+                "value": "{{paymentApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"BK-TEST-001\",\n  \"paymentRef\": \"PAY-TXN-LANKAQR-100293\",\n  \"amountPaid\": 150,\n  \"paymentMethod\": \"qr_pay\",\n  \"timestamp\": \"2026-10-19T15:30:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/paymentCompleted",
+              "host": ["{{baseUrl}}"],
+              "path": ["paymentCompleted"]
+            }
+          }
+        },
+        {
+          "name": "Complete Payment - Idempotency Re-check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Service-Api-Key",
+                "value": "{{paymentApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"BK-TEST-001\",\n  \"paymentRef\": \"PAY-TXN-LANKAQR-100293\",\n  \"amountPaid\": 150,\n  \"paymentMethod\": \"qr_pay\",\n  \"timestamp\": \"2026-10-19T15:30:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/paymentCompleted",
+              "host": ["{{baseUrl}}"],
+              "path": ["paymentCompleted"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

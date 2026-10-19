@@ -18,6 +18,43 @@ enum BookingStatus {
       };
 }
 
+class BookingCharge {
+  final String id;
+  final String type; // 'parking' | 'extension' | 'upgrade'
+  final int amount;
+  final String currency;
+  final DateTime timestamp;
+  final String description;
+
+  const BookingCharge({
+    required this.id,
+    required this.type,
+    required this.amount,
+    this.currency = 'LKR',
+    required this.timestamp,
+    required this.description,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type,
+        'amount': amount,
+        'currency': currency,
+        'timestamp': timestamp.toIso8601String(),
+        'description': description,
+      };
+
+  factory BookingCharge.fromJson(Map<String, dynamic> json) => BookingCharge(
+        id: json['id'] as String? ?? '',
+        type: json['type'] as String? ?? 'parking',
+        amount: (json['amount'] as num?)?.toInt() ?? 0,
+        currency: json['currency'] as String? ?? 'LKR',
+        timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+            DateTime.now(),
+        description: json['description'] as String? ?? '',
+      );
+}
+
 class Booking {
   final String id;
   final String userId;
@@ -35,6 +72,9 @@ class Booking {
   final int estimatedFee;
   final int extensionFee;
   final int finalFee;
+  final List<BookingCharge> charges;
+  final bool reallocatedDueToConflict;
+  final String? reallocatedFromSlotId;
   final String qrToken;
   final DateTime? checkedInAt;
   final DateTime? completedAt;
@@ -61,6 +101,9 @@ class Booking {
     required this.estimatedFee,
     this.extensionFee = 0,
     this.finalFee = 0,
+    this.charges = const [],
+    this.reallocatedDueToConflict = false,
+    this.reallocatedFromSlotId,
     required this.qrToken,
     this.checkedInAt,
     this.completedAt,
@@ -130,6 +173,9 @@ class Booking {
     int? estimatedFee,
     int? extensionFee,
     int? finalFee,
+    List<BookingCharge>? charges,
+    bool? reallocatedDueToConflict,
+    String? reallocatedFromSlotId,
     String? qrToken,
     DateTime? checkedInAt,
     DateTime? completedAt,
@@ -156,6 +202,11 @@ class Booking {
       estimatedFee: estimatedFee ?? this.estimatedFee,
       extensionFee: extensionFee ?? this.extensionFee,
       finalFee: finalFee ?? this.finalFee,
+      charges: charges ?? this.charges,
+      reallocatedDueToConflict:
+          reallocatedDueToConflict ?? this.reallocatedDueToConflict,
+      reallocatedFromSlotId:
+          reallocatedFromSlotId ?? this.reallocatedFromSlotId,
       qrToken: qrToken ?? this.qrToken,
       checkedInAt: checkedInAt ?? this.checkedInAt,
       completedAt: completedAt ?? this.completedAt,
@@ -187,6 +238,9 @@ class Booking {
         'estimatedFee': estimatedFee,
         'extensionFee': extensionFee,
         'finalFee': finalFee,
+        'charges': charges.map((c) => c.toJson()).toList(),
+        'reallocatedDueToConflict': reallocatedDueToConflict,
+        'reallocatedFromSlotId': reallocatedFromSlotId,
         'qrToken': qrToken,
         'checkedInAt': checkedInAt?.toIso8601String(),
         'completedAt': completedAt?.toIso8601String(),
@@ -220,6 +274,12 @@ class Booking {
       _ => BookingStatus.reserved,
     };
 
+    final rawCharges = json['charges'] as List<dynamic>? ?? [];
+    final charges = rawCharges
+        .whereType<Map<String, dynamic>>()
+        .map((c) => BookingCharge.fromJson(c))
+        .toList();
+
     return Booking(
       id: json['id'] as String,
       userId: json['userId'] as String? ?? 'user-001',
@@ -237,6 +297,10 @@ class Booking {
       estimatedFee: json['estimatedFee'] as int? ?? 0,
       extensionFee: json['extensionFee'] as int? ?? 0,
       finalFee: json['finalFee'] as int? ?? 0,
+      charges: charges,
+      reallocatedDueToConflict:
+          json['reallocatedDueToConflict'] as bool? ?? false,
+      reallocatedFromSlotId: json['reallocatedFromSlotId'] as String?,
       qrToken: json['qrToken'] as String? ?? '',
       checkedInAt: _parseDate(json['checkedInAt']),
       completedAt: _parseDate(json['completedAt']),

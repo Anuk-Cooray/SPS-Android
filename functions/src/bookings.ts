@@ -13,9 +13,11 @@ import {
   CheckInRequest,
   ExtendHoldRequest,
   AcceptUpgradeRequest,
+  BookingChargeDocument,
 } from './types';
 import { isSizeCompatible, scoreSlot } from './scoring';
 import { evaluateArrivalFeasibility } from './feasibility';
+import { generateSignedQrToken } from './hmac_token';
 
 // --- Business Logic Functions (invoked by Cloud Functions & Unit Tests) ---
 
@@ -55,9 +57,14 @@ export async function createBookingLogic(
   }
 
   const bookingId = `BK-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
-  const qrToken = `QR-${bookingId}-${slotId}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   const now = new Date();
   const holdExpiresAt = new Date(arrivalDate.getTime() + 15 * 60 * 1000);
+  const qrToken = generateSignedQrToken({
+    bookingId,
+    slotId,
+    arrivalTime: arrivalDate,
+    holdExpiresAt,
+  });
 
   const lotRef = db.collection('parking_lots').doc(lotId);
   const slotRef = lotRef.collection('slots').doc(slotId);
@@ -143,6 +150,16 @@ export async function createBookingLogic(
       estimatedFee,
       extensionFee: 0,
       finalFee: 0,
+      charges: [
+        {
+          id: `CHG-${bookingId}-PARK`,
+          type: 'parking',
+          amount: estimatedFee,
+          currency: 'LKR',
+          timestamp: now.toISOString(),
+          description: `Initial slot reservation fee (${durationHours}h @ LKR ${hourlyRate}/hr)`,
+        },
+      ],
       qrToken,
       checkedInAt: null,
       completedAt: null,
@@ -415,10 +432,21 @@ export async function extendHoldLogic(
     const feeAddition = 50; // LKR 50 per extension
     const newExtensionFee = (booking.extensionFee ?? 0) + feeAddition;
 
+    const updatedCharges: BookingChargeDocument[] = [...(booking.charges || [])];
+    updatedCharges.push({
+      id: `CHG-${bookingId}-EXT-${newExtensionsCount}`,
+      type: 'extension',
+      amount: feeAddition,
+      currency: 'LKR',
+      timestamp: now.toISOString(),
+      description: `Hold arrival extension (+${minutes} min)`,
+    });
+
     transaction.update(bookingRef, {
       holdExpiresAt: newHoldExpiresAt.toISOString(),
       extensionsCount: newExtensionsCount,
       extensionFee: newExtensionFee,
+      charges: updatedCharges,
       status: 'extended',
     });
 
@@ -564,8 +592,13 @@ export async function acceptUpgradeLogic(
       }
     }
 
-    // Rotate QR Token for the new slot
-    const newQrToken = `QR-UPGRADED-${bookingId}-${newSlotId}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    // Rotate QR Token for the new slot using signed HMAC token
+    const newQrToken = generateSignedQrToken({
+      bookingId,
+      slotId: newSlotId,
+      arrivalTime: new Date(booking.arrivalTime),
+      holdExpiresAt: new Date(booking.holdExpiresAt),
+    });
 
     // Update old slot -> available
     transaction.update(oldSlotRef, {

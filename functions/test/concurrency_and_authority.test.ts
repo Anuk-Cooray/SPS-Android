@@ -252,7 +252,7 @@ describe('Server Reservation Authority & Concurrency Tests', () => {
       expect(upgradeRes.success).to.be.true;
       expect(upgradeRes.newSlotId).to.equal('A-01');
       expect(upgradeRes.distanceSavedMeters).to.equal(80);
-      expect(upgradeRes.qrToken).to.include('QR-UPGRADED-');
+      expect(upgradeRes.qrToken).to.include('SPS.v1.');
 
       // Check slot A-02 is released
       const oldSlotDoc = await db

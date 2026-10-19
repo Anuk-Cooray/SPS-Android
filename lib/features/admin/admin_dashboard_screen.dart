@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/models/parking_event_model.dart';
 import '../../data/services/parking_state_manager.dart';
 import 'engine_tuning_modal.dart';
+import 'hardware_integration_simulator_modal.dart';
 import 'telemetry_export_modal.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
@@ -26,6 +28,19 @@ class AdminDashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.only(right: AppSpace.md),
             child: Row(
               children: [
+                if (AppConfig.kDemoMode) ...[
+                  OutlinedButton.icon(
+                    onPressed: () => HardwareIntegrationSimulatorModal.show(context),
+                    icon: const Icon(Icons.developer_board_rounded, size: 16),
+                    label: const Text('Stubs'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(70, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      foregroundColor: c.accent,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.xs),
+                ],
                 OutlinedButton.icon(
                   onPressed: () => EngineTuningModal.show(context),
                   icon: const Icon(Icons.tune_rounded, size: 16),

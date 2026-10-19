@@ -127,4 +127,64 @@ class CloudFunctionsClient {
       client.close();
     }
   }
+
+  /// Sends a raw HTTP POST request to an onRequest HTTPS Cloud Function (e.g. hardware integrations)
+  Future<Map<String, dynamic>> postRaw(
+    String endpointName,
+    Map<String, dynamic> body, {
+    Map<String, String>? customHeaders,
+  }) async {
+    if (kIsWeb) {
+      throw const CloudFunctionsException(
+        code: 'unimplemented',
+        message: 'Web runtime not configured for direct HttpClient',
+      );
+    }
+
+    final url = Uri.parse('$baseUrl/$endpointName');
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 5);
+
+    try {
+      final request = await client.postUrl(url);
+      request.headers.set('Content-Type', 'application/json; charset=utf-8');
+      request.headers.set('Accept', 'application/json');
+
+      if (customHeaders != null) {
+        customHeaders.forEach((key, val) {
+          request.headers.set(key, val);
+        });
+      }
+
+      final bodyBytes = utf8.encode(jsonEncode(body));
+      request.contentLength = bodyBytes.length;
+      request.add(bodyBytes);
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      Map<String, dynamic> decoded = {};
+      try {
+        if (responseBody.isNotEmpty) {
+          decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+        }
+      } catch (_) {}
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return decoded;
+      } else {
+        final errorMsg = decoded['error'] ??
+            decoded['message'] ??
+            'Endpoint $endpointName failed with HTTP ${response.statusCode}';
+        throw CloudFunctionsException(
+          code: 'http_${response.statusCode}',
+          message: errorMsg.toString(),
+          details: decoded,
+        );
+      }
+    } finally {
+      client.close();
+    }
+  }
 }
+

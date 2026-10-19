@@ -61,5 +61,23 @@ service cloud.firestore {
     match /email_verifications/{email} {
       allow read, write: if true;
     }
+
+    // Devices & Sensors: Read allowed for authenticated users (e.g. admin UI), writes forbidden
+    match /devices/{deviceId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // System & Hardware Alerts: Read allowed for authenticated users (admin dashboard), writes forbidden
+    match /admin_alerts/{alertId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // Idempotency Tracking: Server-only access
+    match /processed_payments/{paymentRef} {
+      allow read, write: if false;
+    }
   }
 }
+
