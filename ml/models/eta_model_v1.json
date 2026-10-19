@@ -1,0 +1,49 @@
+{
+  "modelVersion": "v1.0.0-linear",
+  "modelType": "ridge_regression",
+  "description": "Learned Sri Lankan urban ETA residual correction model (J26-IT-335)",
+  "trainedAt": "2026-10-19T21:21:24.714116",
+  "randomSeed": 42,
+  "intercept": 1.10461,
+  "coefficients": {
+    "distanceKm": 0.00528,
+    "isPeakHour": 0.40159,
+    "isWeekend": -0.11233,
+    "weatherFlag": 0.2842,
+    "holidayFlag": -0.17506,
+    "sin_hour": 0.00139,
+    "cos_hour": -0.00265,
+    "zone_Colombo-01_Fort": -0.02145,
+    "zone_Colombo-03_Kollupitiya": 0.01153,
+    "zone_Kandy_Road_Kelaniya": 0.01952,
+    "zone_Malabe_Kaduwela": 0.02843,
+    "zone_Nugegoda_Maharagama": -0.03804
+  },
+  "featureNames": [
+    "distanceKm",
+    "isPeakHour",
+    "isWeekend",
+    "weatherFlag",
+    "holidayFlag",
+    "sin_hour",
+    "cos_hour",
+    "zone_Colombo-01_Fort",
+    "zone_Colombo-03_Kollupitiya",
+    "zone_Kandy_Road_Kelaniya",
+    "zone_Malabe_Kaduwela",
+    "zone_Nugegoda_Maharagama"
+  ],
+  "formula": "correctedEta = providerEta * clamp(intercept + dot(features, coefficients), 0.5, 3.0)",
+  "performance": {
+    "testSampleCount": 360,
+    "maeMinutes": 1.034,
+    "rmseMinutes": 1.595,
+    "mapePercent": 4.94,
+    "baselineComparison": {
+      "heuristicBaselineMae": 8.189,
+      "uncorrectedProviderMae": 4.674,
+      "maeReductionVsProviderPercent": 77.9,
+      "maeReductionVsHeuristicPercent": 87.4
+    }
+  }
+}

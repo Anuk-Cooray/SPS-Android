@@ -1,0 +1,5 @@
+# ML pipeline dependencies (Python 3.14+)
+# Smart Parking Re-optimization System (SLIIT J26-IT-335)
+numpy>=2.0.0
+pandas>=2.2.0
+scikit-learn>=1.5.0
