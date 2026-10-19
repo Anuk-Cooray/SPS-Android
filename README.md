@@ -57,6 +57,56 @@ flutter run
 
 ---
 
+---
+
+## Run Locally (Firebase Emulator Suite & Server Authority)
+
+The reservation authority in this system runs strictly on the server using **Firebase Cloud Functions (Node 20 / TypeScript)** and **Cloud Firestore atomic transactions** to guarantee race condition immunity and autonomous 15-minute hold auto-release even if mobile devices are disconnected or killed.
+
+### 1. Prerequisites
+* Node.js v20+ & npm
+* Java Runtime (JRE / JDK 11+) — *OpenJDK bundled with Android Studio in `Android Studio/jbr` can be used*
+* Firebase CLI: `npx firebase-tools`
+* Flutter SDK 3.47+ (Dart 3.13+)
+
+### 2. Setting Up Cloud Functions & Firestore Emulator
+```bash
+# Navigate to functions folder and install dependencies
+cd functions
+npm install
+npm run build
+cd ..
+
+# Verify Firestore Emulator setup
+npx firebase-tools setup:emulators:firestore
+```
+
+### 3. Running Emulator Suite
+Start the local Firebase Emulator Suite (Firestore on `8080`, Functions on `5001`, Emulator UI on `4000`):
+```bash
+npx firebase-tools emulators:start --only firestore,functions
+```
+Access the Emulator Web UI at `http://localhost:4000` to inspect live collections (`parking_lots`, subcollections `slots`, `bookings`, `parking_events`).
+
+### 4. Running Backend Verification & Concurrency Tests
+Run the automated test suite directly against the live Firestore Emulator:
+```bash
+npx firebase-tools emulators:exec --only firestore "npm test --prefix functions"
+```
+This suite verifies:
+* **Acceptance Criterion 1 (Race Condition Resolution)**: Two simulated clients booking the exact same bay concurrently — atomic transactions guarantee exactly one succeeds and one receives `"Slot just taken — here's the next best"`.
+* **Acceptance Criterion 2 (Autonomous Server Auto-Release)**: An expired hold window is released by the server sweeper (`autoReleaseExpiredHolds`) with the app killed.
+* **Mathematical Scoring Parity**: 100% mathematical parity against shared JSON test vectors (`test_vectors/scoring_test_vectors.json`).
+* **Security Rules Integrity**: Firestore security rules assert that client devices are strictly denied direct writes to slot states, bookings, and audit events.
+
+### 5. Running Flutter Client Tests
+```bash
+flutter analyze
+flutter test --no-pub
+```
+
+---
+
 ## Design System Guidelines
 * **Palette**: Monochrome (`#0A0A0A` text/buttons, `#FFFFFF` surface) with one blue accent (`#2563EB` light, `#3B82F6` dark) reserved strictly for the user's allocated slot and upgrade notifications.
 * **Typography**: Google Fonts `Manrope` with tabular figures for real-time counters, timers, and fees.

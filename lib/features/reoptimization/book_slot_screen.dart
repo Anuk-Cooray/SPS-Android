@@ -324,30 +324,57 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
     _finalizeBooking();
   }
 
-  void _finalizeBooking() {
+  Future<void> _finalizeBooking() async {
     final state = context.read<ParkingStateManager>();
-    final booking = state.reserveSlot(
-      lot: widget.lot,
-      slot: _selectedSlot,
-      arrivalTime: _arrivalTime,
-      durationHours: _durationHours,
-    );
+    try {
+      final booking = await state.reserveSlotAsync(
+        lot: widget.lot,
+        slot: _selectedSlot,
+        arrivalTime: _arrivalTime,
+        durationHours: _durationHours,
+        driverOriginLat: widget.originLat,
+        driverOriginLng: widget.originLng,
+      );
 
-    // Present post-booking dialog with navigation choices
-    BookingConfirmedDialog.show(
-      context,
-      booking: booking,
-      lot: widget.lot,
-      originLat: widget.originLat,
-      originLng: widget.originLng,
-      onStartInAppNav: () {
-        widget.onBookingConfirmed(booking);
-      },
-      onReturnHome: () {
-        // Pop BookSlotScreen back to main screen - booking continues in background
-        Navigator.of(context).pop();
-      },
-    );
+      if (!mounted) return;
+
+      // Present post-booking dialog with navigation choices
+      BookingConfirmedDialog.show(
+        context,
+        booking: booking,
+        lot: widget.lot,
+        originLat: widget.originLat,
+        originLng: widget.originLng,
+        onStartInAppNav: () {
+          widget.onBookingConfirmed(booking);
+        },
+        onReturnHome: () {
+          // Pop BookSlotScreen back to main screen - booking continues in background
+          Navigator.of(context).pop();
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final nextBest = state.findNextBestSlot(widget.lot, _selectedSlot.id);
+      if (nextBest != null) {
+        setState(() {
+          _selectedSlot = nextBest;
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nextBest != null
+                ? "Slot just taken — here's the next best: ${nextBest.id}"
+                : "Slot just taken — please choose another available bay.",
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: const Color(0xFFD97706), // Amber warning
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   @override

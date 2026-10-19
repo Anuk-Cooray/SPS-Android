@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -5,7 +6,10 @@ import '../../core/theme/app_theme.dart';
 import '../models/booking_model.dart';
 import '../models/parking_event_model.dart';
 import '../models/parking_lot_model.dart';
+import '../models/parking_slot_model.dart';
 import '../models/user_model.dart';
+import '../models/vehicle_model.dart';
+import 'cloud_functions_client.dart';
 
 class OtpVerificationResult {
   final bool isValid;
@@ -21,30 +25,44 @@ class FirestoreService {
 
   FirebaseFirestore? _firestore;
   bool _isAvailable = false;
+  final CloudFunctionsClient _functions = CloudFunctionsClient();
   final Map<String, Map<String, dynamic>> _localVerifications = {};
   final Map<String, User> _localUsers = {};
 
   bool get isAvailable => _isAvailable;
+  CloudFunctionsClient get functions => _functions;
 
-  void initialize() {
+  void initialize({
+    bool useEmulator = false,
+    String? emulatorHost,
+    int? emulatorPort,
+  }) {
     try {
       _firestore = FirebaseFirestore.instance;
       _isAvailable = true;
+      _functions.configure(
+        useEmulator: useEmulator,
+        emulatorHost: emulatorHost,
+        emulatorPort: emulatorPort,
+      );
     } catch (e) {
       _isAvailable = false;
       debugPrint('[FirestoreService] Firestore unavailable (offline or desktop mode): $e');
     }
   }
 
-  // --- Collections ---
+  // --- Collection References ---
 
   CollectionReference<Map<String, dynamic>>? get _bookingsRef =>
       _isAvailable ? _firestore!.collection('bookings') : null;
 
   CollectionReference<Map<String, dynamic>>? get _eventsRef =>
-      _isAvailable ? _firestore!.collection('telemetry_events') : null;
+      _isAvailable ? _firestore!.collection('parking_events') : null;
 
-  CollectionReference<Map<String, dynamic>>? get _lotsRef =>
+  CollectionReference<Map<String, dynamic>>? get _parkingLotsRef =>
+      _isAvailable ? _firestore!.collection('parking_lots') : null;
+
+  CollectionReference<Map<String, dynamic>>? get _legacyLotsRef =>
       _isAvailable ? _firestore!.collection('lots') : null;
 
   CollectionReference<Map<String, dynamic>>? get _usersRef =>
@@ -53,42 +71,155 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>>? get _verificationsRef =>
       _isAvailable ? _firestore!.collection('email_verifications') : null;
 
-  /// Creates or overwrites a booking document in Firestore
-  Future<void> saveBooking(Booking booking) async {
-    if (!_isAvailable || _bookingsRef == null) return;
-    try {
-      await _bookingsRef!.doc(booking.id).set(booking.toJson(), SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('[FirestoreService] Failed to save booking ${booking.id}: $e');
-    }
-  }
+  // --- Cloud Functions Callable Invocations (Server Reservation Authority) ---
 
-  /// Updates booking state (e.g. upgraded slot, check-in timestamp, final payment)
-  Future<void> updateBookingStatus({
-    required String bookingId,
-    required BookingStatus status,
-    String? newSlotId,
-    int? distanceSavedMeters,
-    DateTime? checkedInAt,
-    DateTime? completedAt,
-    int? finalFee,
+  /// Invokes `createBooking` callable function to run an atomic server-side reservation transaction
+  Future<Booking> createBookingOnServer({
+    required String lotId,
+    required String slotId,
+    required String userId,
+    required String vehiclePlate,
+    required VehicleSize vehicleSize,
+    required DateTime arrivalTime,
+    required int durationHours,
+    String? vehicleId,
+    String? vehicleType,
+    double? originLat,
+    double? originLng,
   }) async {
-    if (!_isAvailable || _bookingsRef == null) return;
     try {
-      final updates = <String, dynamic>{
-        'status': status.name,
+      final payload = <String, dynamic>{
+        'lotId': lotId,
+        'slotId': slotId,
+        'userId': userId,
+        'vehiclePlate': vehiclePlate,
+        'vehicleSize': vehicleSize.name,
+        'vehicleId': vehicleId ?? 'v-default',
+        'vehicleType': vehicleType ?? 'sedan',
+        'arrivalTime': arrivalTime.toIso8601String(),
+        'durationHours': durationHours,
+        if (originLat != null && originLng != null)
+          'driverOrigin': {
+            'latitude': originLat,
+            'longitude': originLng,
+          },
       };
-      if (newSlotId != null) updates['slotId'] = newSlotId;
-      if (distanceSavedMeters != null) updates['distanceSavedMeters'] = distanceSavedMeters;
-      if (checkedInAt != null) updates['checkedInAt'] = checkedInAt.toIso8601String();
-      if (completedAt != null) updates['completedAt'] = completedAt.toIso8601String();
-      if (finalFee != null) updates['finalFee'] = finalFee;
 
-      await _bookingsRef!.doc(bookingId).update(updates);
+      final result = await _functions.call('createBooking', payload);
+      final booking = Booking.fromJson(result);
+      debugPrint('[FirestoreService] Server reservation confirmed: ${booking.id} (Slot: ${booking.slotId})');
+      return booking;
+    } on SlotCollisionException {
+      // Pass collision exception directly to UI for "Slot just taken" prompt
+      rethrow;
     } catch (e) {
-      debugPrint('[FirestoreService] Failed to update booking $bookingId: $e');
+      debugPrint('[FirestoreService] Server createBooking call failed ($e), executing local fallback');
+      // Offline fallback: generate local booking
+      final holdExpiresAt = arrivalTime.add(const Duration(minutes: 15));
+      return Booking(
+        id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        userId: userId,
+        vehicleId: vehicleId ?? 'v-default',
+        vehiclePlate: vehiclePlate,
+        lotId: lotId,
+        lotName: 'Campus Lot',
+        slotId: slotId,
+        bookedAt: DateTime.now(),
+        arrivalTime: arrivalTime,
+        durationHours: durationHours,
+        status: BookingStatus.reserved,
+        estimatedFee: 100 * durationHours,
+        qrToken: 'QR-TOKEN-$slotId-${DateTime.now().millisecondsSinceEpoch}',
+        holdExpiresAt: holdExpiresAt,
+      );
     }
   }
+
+  /// Invokes `cancelBooking` callable function to atomically release slot on the server
+  Future<bool> cancelBookingOnServer({
+    required String bookingId,
+    required String userId,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'bookingId': bookingId,
+        'userId': userId,
+      };
+      await _functions.call('cancelBooking', payload);
+      debugPrint('[FirestoreService] Server booking cancellation confirmed: $bookingId');
+      return true;
+    } catch (e) {
+      debugPrint('[FirestoreService] Server cancelBooking call failed ($e), falling back');
+      return false;
+    }
+  }
+
+  /// Invokes `checkIn` callable function to mark barrier QR verification on server
+  Future<bool> checkInOnServer({
+    required String qrToken,
+    String? bookingId,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'qrToken': qrToken,
+        'bookingId': ?bookingId,
+      };
+      await _functions.call('checkIn', payload);
+      debugPrint('[FirestoreService] Server checkIn confirmed for QR: $qrToken');
+      return true;
+    } catch (e) {
+      debugPrint('[FirestoreService] Server checkIn call failed: $e');
+      return false;
+    }
+  }
+
+  /// Invokes `extendHold` callable function to add +15 min grace hold
+  Future<Map<String, dynamic>?> extendHoldOnServer({
+    required String bookingId,
+    required String userId,
+    int minutes = 15,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'bookingId': bookingId,
+        'userId': userId,
+        'minutes': minutes,
+      };
+      final res = await _functions.call('extendHold', payload);
+      debugPrint('[FirestoreService] Server extendHold confirmed for: $bookingId');
+      return res;
+    } catch (e) {
+      debugPrint('[FirestoreService] Server extendHold call failed: $e');
+      return null;
+    }
+  }
+
+  /// Invokes `acceptUpgrade` callable function to perform atomic slot swap on the server
+  Future<Map<String, dynamic>?> acceptUpgradeOnServer({
+    required String bookingId,
+    required String newSlotId,
+    required String userId,
+    int currentEtaMinutes = 5,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'bookingId': bookingId,
+        'newSlotId': newSlotId,
+        'userId': userId,
+        'currentEtaMinutes': currentEtaMinutes,
+      };
+      final res = await _functions.call('acceptUpgrade', payload);
+      debugPrint('[FirestoreService] Server acceptUpgrade confirmed: upgraded to $newSlotId');
+      return res;
+    } on SlotCollisionException {
+      rethrow;
+    } catch (e) {
+      debugPrint('[FirestoreService] Server acceptUpgrade call failed: $e');
+      return null;
+    }
+  }
+
+  // --- Bookings Firestore Persistence & Streaming ---
 
   /// Streams active and historical bookings for a specific driver
   Stream<List<Booking>> streamUserBookings(String userId) {
@@ -117,19 +248,27 @@ class FirestoreService {
     });
   }
 
-  // --- Telemetry & Lifecycle Events (SYS-08) ---
+  /// Saves booking locally / to Firestore (for backward-compatible offline persistence)
+  Future<void> saveBooking(Booking booking) async {
+    if (!_isAvailable || _bookingsRef == null) return;
+    try {
+      await _bookingsRef!.doc(booking.id).set(booking.toJson(), SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('[FirestoreService] Note: Direct booking write restricted under server authority ($e)');
+    }
+  }
 
-  /// Logs an algorithmic decision or lifecycle transition event to Firestore
+  // --- Telemetry & Audit Events (SYS-08) ---
+
   Future<void> saveEvent(ParkingEvent event) async {
     if (!_isAvailable || _eventsRef == null) return;
     try {
       await _eventsRef!.doc(event.id).set(event.toJson());
     } catch (e) {
-      debugPrint('[FirestoreService] Failed to save telemetry event ${event.id}: $e');
+      debugPrint('[FirestoreService] Note: Direct event write restricted ($e)');
     }
   }
 
-  /// Streams real-time telemetry events for the research audit log
   Stream<List<ParkingEvent>> streamTelemetryEvents() {
     if (!_isAvailable || _eventsRef == null) {
       return const Stream.empty();
@@ -145,93 +284,120 @@ class FirestoreService {
     });
   }
 
-  // --- Campus Lots & Real-Time Bay Occupancy ---
+  // --- Campus Lots & Subcollection Slots Ingestion & Streaming ---
 
-  /// Seeds default campus lots into Firestore if the 'lots' collection is empty
+  /// Seeds default campus lots into Firestore subcollections if empty
   Future<void> seedInitialLotsIfEmpty(List<ParkingLot> defaultLots) async {
-    if (!_isAvailable || _lotsRef == null) return;
+    if (!_isAvailable) return;
+    final lotsCollection = _parkingLotsRef ?? _legacyLotsRef;
+    if (lotsCollection == null) return;
+
     try {
-      final snapshot = await _lotsRef!.limit(1).get().timeout(const Duration(seconds: 2));
+      final snapshot = await lotsCollection.limit(1).get().timeout(const Duration(seconds: 2));
       if (snapshot.docs.isEmpty) {
         for (final lot in defaultLots) {
-          await _lotsRef!.doc(lot.id).set(lot.toJson());
+          // Write lot document
+          await lotsCollection.doc(lot.id).set(lot.toJson());
+
+          // Write subcollection parking_lots/{lotId}/slots/{slotId}
+          final slotsSub = lotsCollection.doc(lot.id).collection('slots');
+          final batch = _firestore!.batch();
+          for (final slot in lot.slots) {
+            batch.set(slotsSub.doc(slot.id), {
+              'id': slot.id,
+              'lotId': lot.id,
+              'row': slot.row,
+              'number': slot.number,
+              'size': slot.size.name,
+              'type': slot.type.name,
+              'walkingDistanceMeters': slot.walkingDistanceMeters,
+              'state': slot.isAvailable ? 'available' : (slot.state == SlotState.blocked ? 'blocked' : 'occupied'),
+              'bookingId': slot.bookingId,
+              'updatedAt': DateTime.now().toIso8601String(),
+              'updatedBy': 'system',
+            });
+          }
+          await batch.commit();
         }
-        debugPrint('[FirestoreService] Seeded ${defaultLots.length} campus lots to Firestore');
+        debugPrint('[FirestoreService] Seeded ${defaultLots.length} campus lots and subcollections to Firestore');
       }
     } catch (e) {
       debugPrint('[FirestoreService] Seed lots error: $e');
     }
   }
 
-  /// Updates the occupancy state of a specific parking slot in a lot in Firestore
+  /// Streams real-time campus parking lots, seamlessly combining parent lot doc and subcollection slots
+  Stream<List<ParkingLot>> streamLots() {
+    if (!_isAvailable) {
+      return const Stream.empty();
+    }
+
+    final collection = _parkingLotsRef ?? _legacyLotsRef;
+    if (collection == null) return const Stream.empty();
+
+    return collection.snapshots().asyncMap((snapshot) async {
+      final lotsList = <ParkingLot>[];
+
+      for (final doc in snapshot.docs) {
+        final lotData = doc.data();
+        final baseLot = ParkingLot.fromJson(lotData);
+
+        // Fetch subcollection slots if available
+        try {
+          final slotsSnap = await doc.reference.collection('slots').get().timeout(const Duration(milliseconds: 1500));
+          if (slotsSnap.docs.isNotEmpty) {
+            final subSlots = slotsSnap.docs
+                .map((sDoc) => ParkingSlot.fromJson(sDoc.data()))
+                .toList();
+
+            final freeCount = subSlots.where((s) => s.isAvailable).length;
+            lotsList.add(baseLot.copyWith(
+              slots: subSlots,
+              freeSlots: freeCount,
+              totalSlots: subSlots.length,
+            ));
+            continue;
+          }
+        } catch (_) {}
+
+        lotsList.add(baseLot);
+      }
+
+      return lotsList;
+    });
+  }
+
+  /// Updates slot state (retained for backward compatibility and mock test runners)
   Future<void> updateSlotState({
     required String lotId,
     required String slotId,
     required SlotState state,
     String? reservedBy,
   }) async {
-    if (!_isAvailable || _lotsRef == null) return;
+    if (!_isAvailable) return;
     try {
-      final docRef = _lotsRef!.doc(lotId);
-      final doc = await docRef.get().timeout(const Duration(seconds: 2));
-      if (doc.exists && doc.data() != null) {
-        final lot = ParkingLot.fromJson(doc.data()!);
-        final updatedSlots = lot.slots.map((s) {
-          if (s.id == slotId) {
-            return s.copyWith(state: state);
-          }
-          return s;
-        }).toList();
-        final freeCount = updatedSlots.where((s) => s.state == SlotState.free).length;
-        await docRef.update({
-          'slots': updatedSlots.map((s) => s.toJson()).toList(),
-          'freeSlots': freeCount,
-          'lastUpdated': DateTime.now().toIso8601String(),
-        });
-      }
+      final lotsCollection = _parkingLotsRef ?? _legacyLotsRef;
+      if (lotsCollection == null) return;
+
+      // Update subcollection slot
+      final slotRef = lotsCollection.doc(lotId).collection('slots').doc(slotId);
+      final serverState = state == SlotState.free
+          ? 'available'
+          : (state == SlotState.blocked ? 'blocked' : 'reserved');
+
+      await slotRef.set({
+        'state': serverState,
+        'bookingId': reservedBy,
+        'updatedAt': DateTime.now().toIso8601String(),
+        'updatedBy': 'app',
+      }, SetOptions(merge: true)).timeout(const Duration(seconds: 2));
     } catch (e) {
-      debugPrint('[FirestoreService] Error updating slot $slotId: $e');
+      debugPrint('[FirestoreService] Note: Direct slot mutation skipped under server authority ($e)');
     }
-  }
-
-  /// Streams real-time campus parking lots and slot states
-  Stream<List<ParkingLot>> streamLots() {
-    if (!_isAvailable || _lotsRef == null) {
-      return const Stream.empty();
-    }
-    return _lotsRef!.snapshots().map((snapshot) {
-      return snapshot.docs
-          .map((doc) => ParkingLot.fromJson(doc.data()))
-          .toList();
-    });
-  }
-
-  /// Streams live lot slot states updated by CCTV vision pipeline
-  Stream<Map<String, SlotState>> streamSlotOccupancy(String lotId) {
-    if (!_isAvailable || _lotsRef == null) {
-      return const Stream.empty();
-    }
-    return _lotsRef!.doc(lotId).snapshots().map((doc) {
-      final data = doc.data();
-      if (data == null || !data.containsKey('slots')) return {};
-      final slotsList = data['slots'] as List<dynamic>? ?? [];
-      final result = <String, SlotState>{};
-      for (final s in slotsList) {
-        if (s is Map<String, dynamic>) {
-          final slotId = s['id'] as String? ?? '';
-          final stateString = s['state'] as String? ?? 'free';
-          result[slotId] = (stateString == 'occupied' || stateString == 'taken')
-              ? SlotState.taken
-              : SlotState.free;
-        }
-      }
-      return result;
-    });
   }
 
   // --- Real Driver Profiles & Registered Vehicles ---
 
-  /// Saves or updates a real user profile and vehicle fleet in Firestore
   Future<void> saveUser(User user) async {
     final cleanEmail = user.email.trim().toLowerCase();
     _localUsers[cleanEmail] = user;
@@ -246,7 +412,6 @@ class FirestoreService {
     }
   }
 
-  /// Fetches an existing user from Firestore, with fallback to local cache
   Future<User?> fetchUser(String email) async {
     final cleanEmail = email.trim().toLowerCase();
     if (_isAvailable && _usersRef != null) {
@@ -269,8 +434,6 @@ class FirestoreService {
 
   // --- Email OTP Verification Collection (M1) ---
 
-  /// Generates a real 6-digit OTP code, persists it to Firestore with a 5-minute expiry,
-  /// and stores it in the local memory cache for guaranteed offline reliability.
   Future<String> sendEmailVerificationOtp(String email) async {
     final cleanEmail = email.trim().toLowerCase();
     final random = Random();
@@ -290,7 +453,6 @@ class FirestoreService {
     _localVerifications[cleanEmail] = data;
 
     if (_isAvailable && _verificationsRef != null) {
-      // Persist in background with timeout so network delays never block the driver
       _verificationsRef!
           .doc(cleanEmail)
           .set(data)
@@ -303,8 +465,6 @@ class FirestoreService {
     return code;
   }
 
-  /// Verifies the entered 6-digit code against Firestore / local cache.
-  /// Enforces expiration and a 5-attempt limit to prevent brute force attacks.
   Future<OtpVerificationResult> verifyEmailOtp(String email, String enteredOtp) async {
     final cleanEmail = email.trim().toLowerCase();
     Map<String, dynamic>? record;

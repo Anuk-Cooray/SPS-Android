@@ -1,0 +1,266 @@
+[
+  {
+    "id": "vector_01_optimal_match",
+    "description": "Standard medium car in medium slot close to entrance, low lot occupancy",
+    "slot": {
+      "id": "A-01",
+      "row": "A",
+      "number": 1,
+      "size": "medium",
+      "type": "covered",
+      "walkingDistanceMeters": 25,
+      "state": "available"
+    },
+    "lot": {
+      "totalSlots": 20,
+      "freeSlots": 16
+    },
+    "vehicle": {
+      "size": "medium",
+      "type": "sedan"
+    },
+    "preferences": {
+      "preferNearEntrance": true,
+      "coveredParkingOnly": true
+    },
+    "expected": {
+      "isEligible": true,
+      "distanceScore": 90.0,
+      "sizeFitScore": 100.0,
+      "preferenceScore": 100.0,
+      "demandPenalty": 5.0,
+      "totalScore": 80.25
+    }
+  },
+  {
+    "id": "vector_02_size_incompatible",
+    "description": "Large SUV cannot fit in a small slot",
+    "slot": {
+      "id": "B-05",
+      "row": "B",
+      "number": 5,
+      "size": "small",
+      "type": "normal",
+      "walkingDistanceMeters": 40,
+      "state": "available"
+    },
+    "lot": {
+      "totalSlots": 20,
+      "freeSlots": 10
+    },
+    "vehicle": {
+      "size": "large",
+      "type": "suv"
+    },
+    "preferences": {
+      "preferNearEntrance": true,
+      "coveredParkingOnly": false
+    },
+    "expected": {
+      "isEligible": false,
+      "distanceScore": 0.0,
+      "sizeFitScore": 0.0,
+      "preferenceScore": 0.0,
+      "demandPenalty": 0.0,
+      "totalScore": 0.0
+    }
+  },
+  {
+    "id": "vector_03_small_in_large_wastage_penalty",
+    "description": "Small vehicle in large bay receives capacity wastage penalty (sizeFit = 60)",
+    "slot": {
+      "id": "C-12",
+      "row": "C",
+      "number": 12,
+      "size": "large",
+      "type": "normal",
+      "walkingDistanceMeters": 100,
+      "state": "available"
+    },
+    "lot": {
+      "totalSlots": 50,
+      "freeSlots": 50
+    },
+    "vehicle": {
+      "size": "small",
+      "type": "threeWheeler"
+    },
+    "preferences": {
+      "preferNearEntrance": false,
+      "coveredParkingOnly": false
+    },
+    "expected": {
+      "isEligible": true,
+      "distanceScore": 60.0,
+      "sizeFitScore": 60.0,
+      "preferenceScore": 50.0,
+      "demandPenalty": 0.0,
+      "totalScore": 49.0
+    }
+  },
+  {
+    "id": "vector_04_high_demand_penalty",
+    "description": "Lot at 90% occupancy applies high demand penalty (22.5)",
+    "slot": {
+      "id": "A-03",
+      "row": "A",
+      "number": 3,
+      "size": "medium",
+      "type": "normal",
+      "walkingDistanceMeters": 50,
+      "state": "available"
+    },
+    "lot": {
+      "totalSlots": 100,
+      "freeSlots": 10
+    },
+    "vehicle": {
+      "size": "medium",
+      "type": "sedan"
+    },
+    "preferences": {
+      "preferNearEntrance": true,
+      "coveredParkingOnly": false
+    },
+    "expected": {
+      "isEligible": true,
+      "distanceScore": 80.0,
+      "sizeFitScore": 100.0,
+      "preferenceScore": 85.0,
+      "demandPenalty": 22.5,
+      "totalScore": 70.625
+    }
+  },
+  {
+    "id": "vector_05_uncovered_penalty_when_covered_requested",
+    "description": "Uncovered slot receives heavy penalty (-40) when user insists on covered parking",
+    "slot": {
+      "id": "D-02",
+      "row": "D",
+      "number": 2,
+      "size": "medium",
+      "type": "normal",
+      "walkingDistanceMeters": 150,
+      "state": "available"
+    },
+    "lot": {
+      "totalSlots": 40,
+      "freeSlots": 20
+    },
+    "vehicle": {
+      "size": "medium",
+      "type": "sedan"
+    },
+    "preferences": {
+      "preferNearEntrance": false,
+      "coveredParkingOnly": true
+    },
+    "expected": {
+      "isEligible": true,
+      "distanceScore": 40.0,
+      "sizeFitScore": 100.0,
+      "preferenceScore": 10.0,
+      "demandPenalty": 12.5,
+      "totalScore": 41.125
+    }
+  },
+  {
+    "id": "vector_06_far_walking_distance_clamped",
+    "description": "Slot beyond 250m threshold (300m) clamps distance score to 0",
+    "slot": {
+      "id": "E-20",
+      "row": "E",
+      "number": 20,
+      "size": "medium",
+      "type": "normal",
+      "walkingDistanceMeters": 300,
+      "state": "available"
+    },
+    "lot": {
+      "totalSlots": 10,
+      "freeSlots": 5
+    },
+    "vehicle": {
+      "size": "medium",
+      "type": "sedan"
+    },
+    "preferences": {
+      "preferNearEntrance": false,
+      "coveredParkingOnly": false
+    },
+    "expected": {
+      "isEligible": true,
+      "distanceScore": 0.0,
+      "sizeFitScore": 100.0,
+      "preferenceScore": 50.0,
+      "demandPenalty": 12.5,
+      "totalScore": 33.125
+    }
+  },
+  {
+    "id": "vector_07_small_in_medium_fit",
+    "description": "Small vehicle in medium slot has slight sizeFit penalty (85)",
+    "slot": {
+      "id": "B-02",
+      "row": "B",
+      "number": 2,
+      "size": "medium",
+      "type": "normal",
+      "walkingDistanceMeters": 75,
+      "state": "available"
+    },
+    "lot": {
+      "totalSlots": 30,
+      "freeSlots": 15
+    },
+    "vehicle": {
+      "size": "small",
+      "type": "threeWheeler"
+    },
+    "preferences": {
+      "preferNearEntrance": false,
+      "coveredParkingOnly": false
+    },
+    "expected": {
+      "isEligible": true,
+      "distanceScore": 70.0,
+      "sizeFitScore": 85.0,
+      "preferenceScore": 50.0,
+      "demandPenalty": 12.5,
+      "totalScore": 57.375
+    }
+  },
+  {
+    "id": "vector_08_medium_in_large_fit",
+    "description": "Medium vehicle in large slot has minor sizeFit penalty (80)",
+    "slot": {
+      "id": "L-01",
+      "row": "L",
+      "number": 1,
+      "size": "large",
+      "type": "covered",
+      "walkingDistanceMeters": 50,
+      "state": "available"
+    },
+    "lot": {
+      "totalSlots": 20,
+      "freeSlots": 10
+    },
+    "vehicle": {
+      "size": "medium",
+      "type": "van"
+    },
+    "preferences": {
+      "preferNearEntrance": true,
+      "coveredParkingOnly": true
+    },
+    "expected": {
+      "isEligible": true,
+      "distanceScore": 80.0,
+      "sizeFitScore": 80.0,
+      "preferenceScore": 100.0,
+      "demandPenalty": 12.5,
+      "totalScore": 70.125
+    }
+  }
+]

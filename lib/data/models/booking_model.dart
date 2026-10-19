@@ -174,35 +174,50 @@ class Booking {
         'holdExpiresAt': holdExpiresAt?.toIso8601String(),
       };
 
-  factory Booking.fromJson(Map<String, dynamic> json) => Booking(
-        id: json['id'] as String,
-        userId: json['userId'] as String? ?? 'user-001',
-        vehicleId: json['vehicleId'] as String? ?? 'v-default',
-        vehiclePlate: json['vehiclePlate'] as String? ?? 'CAB-4821',
-        lotId: json['lotId'] as String,
-        lotName: json['lotName'] as String,
-        slotId: json['slotId'] as String,
-        bookedAt: DateTime.tryParse(json['bookedAt'] as String? ?? '') ?? DateTime.now(),
-        arrivalTime: DateTime.tryParse(json['arrivalTime'] as String? ?? '') ?? DateTime.now(),
-        durationHours: json['durationHours'] as int? ?? 1,
-        status: BookingStatus.values.firstWhere(
-          (s) => s.name == json['status'],
-          orElse: () => BookingStatus.reserved,
-        ),
-        originalSlotId: json['originalSlotId'] as String?,
-        distanceSavedMeters: json['distanceSavedMeters'] as int? ?? 0,
-        estimatedFee: json['estimatedFee'] as int? ?? 0,
-        extensionFee: json['extensionFee'] as int? ?? 0,
-        finalFee: json['finalFee'] as int? ?? 0,
-        qrToken: json['qrToken'] as String? ?? '',
-        checkedInAt: json['checkedInAt'] != null
-            ? DateTime.tryParse(json['checkedInAt'] as String)
-            : null,
-        completedAt: json['completedAt'] != null
-            ? DateTime.tryParse(json['completedAt'] as String)
-            : null,
-        holdExpiresAt: json['holdExpiresAt'] != null
-            ? DateTime.tryParse(json['holdExpiresAt'] as String)
-            : null,
-      );
+  static DateTime? _parseDate(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is String && val.isNotEmpty) return DateTime.tryParse(val);
+    try {
+      return (val as dynamic).toDate() as DateTime;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  factory Booking.fromJson(Map<String, dynamic> json) {
+    final rawStatus = json['status'] as String? ?? 'reserved';
+    final status = switch (rawStatus) {
+      'auto_released' || 'autoCancelled' => BookingStatus.autoCancelled,
+      'upgraded' => BookingStatus.upgraded,
+      'checkedIn' => BookingStatus.checkedIn,
+      'extended' => BookingStatus.extended,
+      'completed' => BookingStatus.completed,
+      'cancelled' => BookingStatus.cancelled,
+      _ => BookingStatus.reserved,
+    };
+
+    return Booking(
+      id: json['id'] as String,
+      userId: json['userId'] as String? ?? 'user-001',
+      vehicleId: json['vehicleId'] as String? ?? 'v-default',
+      vehiclePlate: json['vehiclePlate'] as String? ?? 'CAB-4821',
+      lotId: json['lotId'] as String,
+      lotName: json['lotName'] as String,
+      slotId: json['slotId'] as String,
+      bookedAt: _parseDate(json['bookedAt']) ?? DateTime.now(),
+      arrivalTime: _parseDate(json['arrivalTime']) ?? DateTime.now(),
+      durationHours: json['durationHours'] as int? ?? 1,
+      status: status,
+      originalSlotId: json['originalSlotId'] as String?,
+      distanceSavedMeters: json['distanceSavedMeters'] as int? ?? 0,
+      estimatedFee: json['estimatedFee'] as int? ?? 0,
+      extensionFee: json['extensionFee'] as int? ?? 0,
+      finalFee: json['finalFee'] as int? ?? 0,
+      qrToken: json['qrToken'] as String? ?? '',
+      checkedInAt: _parseDate(json['checkedInAt']),
+      completedAt: _parseDate(json['completedAt']),
+      holdExpiresAt: _parseDate(json['holdExpiresAt']),
+    );
+  }
 }

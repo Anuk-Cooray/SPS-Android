@@ -1,0 +1,14 @@
+# Node modules
+node_modules/
+
+# Compiled TypeScript output
+lib/
+
+# Firebase debug logs
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+
+# Temporary files
+*.tmp
+*.log

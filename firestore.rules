@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is the request authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: is the user the owner of the document
+    function isOwner(userId) {
+      return isAuthenticated() && (request.auth.uid == userId || (request.auth.token.email != null && request.auth.token.email == userId));
+    }
+
+    // Parking Lots: Read-only for clients, writes forbidden (server authority only)
+    match /parking_lots/{lotId} {
+      allow read: if true;
+      allow write: if false;
+
+      // Subcollection: Slots
+      match /slots/{slotId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    // Legacy Lots collection (for backward compatibility)
+    match /lots/{lotId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Bookings: Drivers can only read their own bookings; direct writes forbidden
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isOwner(resource.data.userId));
+      allow write: if false;
+    }
+
+    // Telemetry & Parking Events: Drivers can only read their own events; direct writes forbidden
+    match /parking_events/{eventId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isOwner(resource.data.userId));
+      allow write: if false;
+    }
+
+    match /telemetry_events/{eventId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isOwner(resource.data.userId));
+      allow write: if false;
+    }
+
+    // User Profiles: Only owner can read/write their own profile
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Email OTP Verifications: Read/write for auth operations
+    match /email_verifications/{email} {
+      allow read, write: if true;
+    }
+  }
+}

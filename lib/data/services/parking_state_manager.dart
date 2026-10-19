@@ -15,6 +15,7 @@ import '../models/parking_lot_model.dart';
 import '../models/parking_slot_model.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
+import 'cloud_functions_client.dart';
 import 'firestore_service.dart';
 import 'mock_data.dart';
 
@@ -33,6 +34,7 @@ class ParkingStateManager extends ChangeNotifier {
 
   // Active navigation / in-transit state (SYS-03)
   Booking? _currentActiveBooking;
+  String? _lastCollisionError;
   static const double _initialDistanceKm = 4.2;
   static const int _initialEtaMinutes = 12;
   int _etaMinutes = _initialEtaMinutes;
@@ -230,6 +232,35 @@ class ParkingStateManager extends ChangeNotifier {
   void updateScoringWeights(ScoringWeights newWeights) {
     _engine.weights = newWeights;
     notifyListeners();
+  }
+
+  String? get lastCollisionError => _lastCollisionError;
+  void clearCollisionError() {
+    _lastCollisionError = null;
+    notifyListeners();
+  }
+
+  ParkingSlot? findNextBestSlot(ParkingLot lot, String excludedSlotId) {
+    final vehicle = _currentUser.defaultVehicle ??
+        const Vehicle(
+          id: 'veh-temp',
+          plateNumber: 'CAB-4821',
+          type: VehicleType.sedan,
+          size: VehicleSize.medium,
+        );
+
+    final ranked = _engine.scoreAndRankSlots(
+      lot: lot,
+      vehicle: vehicle,
+      preferences: _currentUser.preferences,
+    );
+
+    for (final r in ranked) {
+      if (r.slot.id != excludedSlotId && r.slot.isAvailable) {
+        return r.slot;
+      }
+    }
+    return null;
   }
 
   // Driver-specific active & history bookings
@@ -455,12 +486,51 @@ class ParkingStateManager extends ChangeNotifier {
     );
   }
 
-  // Booking Flow (M5)
+  void _applyLocalBooking(Booking newBooking, ParkingLot lot, ParkingSlot slot) {
+    final updatedSlots = lot.slots.map((s) {
+      if (s.id == slot.id) {
+        return s.copyWith(state: SlotState.taken);
+      }
+      return s;
+    }).toList();
+
+    final updatedLot = lot.copyWith(
+      freeSlots: (lot.freeSlots - 1).clamp(0, lot.totalSlots),
+      slots: updatedSlots,
+    );
+
+    final lotIndex = _lots.indexWhere((l) => l.id == lot.id);
+    if (lotIndex != -1) {
+      _lots[lotIndex] = updatedLot;
+    }
+
+    _bookings.insert(0, newBooking);
+    _currentActiveBooking = newBooking;
+    _etaMinutes = _initialEtaMinutes;
+    _distanceKm = _initialDistanceKm;
+    _routeProgress = 0.0;
+    _hasTriggeredAutoUpgrade = false;
+    _hasArrivedAtDestination = false;
+    pauseMovementSimulation();
+    _startHoldTimer();
+
+    _logEvent(
+      bookingId: newBooking.id,
+      type: ParkingEventType.booked,
+      description: 'Booked slot ${slot.id} in ${lot.name} · Hold expires in 15 mins',
+    );
+
+    notifyListeners();
+  }
+
+  // Booking Flow (M5) — Server Authority with Local Fallback
   Booking reserveSlot({
     required ParkingLot lot,
     required ParkingSlot slot,
     required DateTime arrivalTime,
     required int durationHours,
+    double? originLat,
+    double? originLng,
   }) {
     final vehicle = _currentUser.defaultVehicle ??
         const Vehicle(
@@ -488,50 +558,102 @@ class ParkingStateManager extends ChangeNotifier {
       holdExpiresAt: holdExpiry,
     );
 
-    // Update slot state to taken/yours in lot
-    final updatedSlots = lot.slots.map((s) {
-      if (s.id == slot.id) {
-        return s.copyWith(state: SlotState.taken);
-      }
-      return s;
-    }).toList();
+    _applyLocalBooking(newBooking, lot, slot);
 
-    final updatedLot = lot.copyWith(
-      freeSlots: (lot.freeSlots - 1).clamp(0, lot.totalSlots),
-      slots: updatedSlots,
-    );
-
-    final lotIndex = _lots.indexWhere((l) => l.id == lot.id);
-    if (lotIndex != -1) {
-      _lots[lotIndex] = updatedLot;
+    // Call server callable in background to enforce server authority
+    if (!_isTestRuntime) {
+      _firestore.createBookingOnServer(
+        lotId: lot.id,
+        slotId: slot.id,
+        userId: _currentUser.id,
+        vehiclePlate: vehicle.plateNumber,
+        vehicleSize: vehicle.size,
+        vehicleId: vehicle.id,
+        arrivalTime: arrivalTime,
+        durationHours: durationHours,
+        originLat: originLat,
+        originLng: originLng,
+      ).then((serverBooking) {
+        final idx = _bookings.indexWhere((b) => b.id == newBooking.id);
+        if (idx != -1) {
+          _bookings[idx] = serverBooking;
+        }
+        if (_currentActiveBooking?.id == newBooking.id) {
+          _currentActiveBooking = serverBooking;
+        }
+        notifyListeners();
+      }).catchError((e) {
+        if (e is SlotCollisionException) {
+          final nextBest = findNextBestSlot(lot, slot.id);
+          _lastCollisionError = "Slot just taken — here's the next best: ${nextBest?.id ?? 'another bay'}";
+          notifyListeners();
+        }
+        return null;
+      });
     }
 
-    _bookings.insert(0, newBooking);
-    _currentActiveBooking = newBooking;
-    _firestore.saveBooking(newBooking);
-    _etaMinutes = _initialEtaMinutes;
-    _distanceKm = _initialDistanceKm;
-    _routeProgress = 0.0;
-    _hasTriggeredAutoUpgrade = false;
-    _hasArrivedAtDestination = false;
-    pauseMovementSimulation();
-    _startHoldTimer();
-
-    unawaited(_firestore.updateSlotState(
-      lotId: lot.id,
-      slotId: slot.id,
-      state: SlotState.taken,
-      reservedBy: _currentUser.id,
-    ));
-
-    _logEvent(
-      bookingId: newBooking.id,
-      type: ParkingEventType.booked,
-      description: 'Booked slot ${slot.id} in ${lot.name} · Hold expires in 15 mins',
-    );
-
-    notifyListeners();
     return newBooking;
+  }
+
+  Future<Booking> reserveSlotAsync({
+    required ParkingLot lot,
+    required ParkingSlot slot,
+    required DateTime arrivalTime,
+    required int durationHours,
+    double? driverOriginLat,
+    double? driverOriginLng,
+  }) async {
+    final vehicle = _currentUser.defaultVehicle ??
+        const Vehicle(
+          id: 'veh-temp',
+          plateNumber: 'CAB-4821',
+          type: VehicleType.sedan,
+          size: VehicleSize.medium,
+        );
+
+    try {
+      Booking booking;
+      if (!_isTestRuntime && _firestore.isAvailable) {
+        booking = await _firestore.createBookingOnServer(
+          lotId: lot.id,
+          slotId: slot.id,
+          userId: _currentUser.id,
+          vehiclePlate: vehicle.plateNumber,
+          vehicleSize: vehicle.size,
+          vehicleId: vehicle.id,
+          arrivalTime: arrivalTime,
+          durationHours: durationHours,
+          originLat: driverOriginLat,
+          originLng: driverOriginLng,
+        );
+      } else {
+        final holdExpiry = arrivalTime.add(const Duration(minutes: 15));
+        booking = Booking(
+          id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+          userId: _currentUser.id,
+          vehicleId: vehicle.id,
+          vehiclePlate: vehicle.plateNumber,
+          lotId: lot.id,
+          lotName: lot.name,
+          slotId: slot.id,
+          bookedAt: DateTime.now(),
+          arrivalTime: arrivalTime,
+          durationHours: durationHours,
+          status: BookingStatus.reserved,
+          estimatedFee: lot.hourlyRate * durationHours,
+          qrToken: 'QR-TOKEN-${slot.id}-${DateTime.now().millisecondsSinceEpoch}',
+          holdExpiresAt: holdExpiry,
+        );
+      }
+
+      _applyLocalBooking(booking, lot, slot);
+      return booking;
+    } on SlotCollisionException {
+      final nextBest = findNextBestSlot(lot, slot.id);
+      _lastCollisionError = "Slot just taken — here's the next best: ${nextBest?.id ?? 'another bay'}";
+      notifyListeners();
+      rethrow;
+    }
   }
 
   // In-Transit Route Movement Simulation (SYS-03)
@@ -715,6 +837,23 @@ class ParkingStateManager extends ChangeNotifier {
     _upgradeCandidateSlot = null;
     _firestore.saveBooking(updatedBooking);
 
+    if (!_isTestRuntime) {
+      unawaited(_firestore.acceptUpgradeOnServer(
+        bookingId: updatedBooking.id,
+        newSlotId: newSlot.id,
+        userId: _currentUser.id,
+        currentEtaMinutes: _etaMinutes,
+      ).catchError((e) {
+        if (e is SlotCollisionException) {
+          _lastCollisionError = "Upgrade slot just taken by another driver.";
+          _upgradeOfferAvailable = false;
+          _upgradeCandidateSlot = null;
+          notifyListeners();
+        }
+        return null;
+      }));
+    }
+
     unawaited(_firestore.updateSlotState(
       lotId: lot.id,
       slotId: oldSlotId,
@@ -767,6 +906,14 @@ class ParkingStateManager extends ChangeNotifier {
     _currentActiveBooking = updated;
     _firestore.saveBooking(updated);
 
+    if (!_isTestRuntime) {
+      unawaited(_firestore.extendHoldOnServer(
+        bookingId: updated.id,
+        userId: _currentUser.id,
+        minutes: minutes,
+      ));
+    }
+
     _logEvent(
       bookingId: updated.id,
       type: ParkingEventType.extended,
@@ -791,6 +938,13 @@ class ParkingStateManager extends ChangeNotifier {
     }
     _currentActiveBooking = updated;
     _firestore.saveBooking(updated);
+
+    if (!_isTestRuntime) {
+      unawaited(_firestore.checkInOnServer(
+        qrToken: updated.qrToken,
+        bookingId: updated.id,
+      ));
+    }
 
     _logEvent(
       bookingId: updated.id,
@@ -839,6 +993,13 @@ class ParkingStateManager extends ChangeNotifier {
     }
     _currentActiveBooking = null;
     _firestore.saveBooking(updated);
+
+    if (!_isTestRuntime && !autoCancelled) {
+      unawaited(_firestore.cancelBookingOnServer(
+        bookingId: booking.id,
+        userId: _currentUser.id,
+      ));
+    }
 
     unawaited(_firestore.updateSlotState(
       lotId: booking.lotId,
@@ -911,7 +1072,7 @@ class ParkingStateManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Hold-Time & Auto-Release Control (Option 1)
+  // Hold-Time & Countdown Display (UI Only - Server handles auto-release)
   Timer? _holdCountdownTimer;
 
   bool get _isTestRuntime {
@@ -925,6 +1086,8 @@ class ParkingStateManager extends ChangeNotifier {
   void _startHoldTimer() {
     _stopHoldTimer();
     if (_isTestRuntime) return;
+    // UI countdown ticker only; client DOES NOT cancel reservations.
+    // Autonomous server sweeper autoReleaseExpiredHolds handles releases idempotently.
     _holdCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_currentActiveBooking == null ||
           _currentActiveBooking!.status == BookingStatus.checkedIn ||
@@ -932,12 +1095,6 @@ class ParkingStateManager extends ChangeNotifier {
           _currentActiveBooking!.status == BookingStatus.cancelled ||
           _currentActiveBooking!.status == BookingStatus.autoCancelled) {
         _stopHoldTimer();
-        return;
-      }
-
-      if (_currentActiveBooking!.isHoldExpired) {
-        _stopHoldTimer();
-        cancelBooking(autoCancelled: true);
         return;
       }
 
