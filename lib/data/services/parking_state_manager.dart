@@ -1,4 +1,7 @@
 import 'package:flutter/foundation.dart';
+
+import 'dart:async';
+
 import '../../core/theme/app_theme.dart';
 import '../models/booking_model.dart';
 import '../models/parking_event_model.dart';
@@ -7,8 +10,15 @@ import '../models/parking_slot_model.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import 'mock_data.dart';
+import 'ai_occupancy_service.dart';
 
 class ParkingStateManager extends ChangeNotifier {
+  static const aiLotId = 'lot-main';
+  final AiOccupancyService _aiService;
+  Timer? _aiRefreshTimer;
+  final Set<String> _aiBookingIds = {};
+  bool _aiRefreshing = false;
+  String? _aiError;
   User _currentUser = MockData.initialUser;
   bool _isLoggedIn = true;
   final List<ParkingLot> _lots = MockData.getInitialLots();
@@ -22,8 +32,14 @@ class ParkingStateManager extends ChangeNotifier {
   bool _upgradeOfferAvailable = false;
   ParkingSlot? _upgradeCandidateSlot;
 
-  ParkingStateManager() {
+  ParkingStateManager({AiOccupancyService? aiService})
+    : _aiService = aiService ?? AiOccupancyService() {
     _refreshActiveBooking();
+    refreshAiOccupancy();
+    _aiRefreshTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => refreshAiOccupancy(),
+    );
   }
 
   // Getters
@@ -37,6 +53,8 @@ class ParkingStateManager extends ChangeNotifier {
   double get distanceKm => _distanceKm;
   bool get upgradeOfferAvailable => _upgradeOfferAvailable;
   ParkingSlot? get upgradeCandidateSlot => _upgradeCandidateSlot;
+  bool get isAiRefreshing => _aiRefreshing;
+  String? get aiError => _aiError;
 
   // Active bookings list
   List<Booking> get activeBookings =>
@@ -46,10 +64,12 @@ class ParkingStateManager extends ChangeNotifier {
       _bookings.where((b) => b.status == BookingStatus.reserved).toList();
 
   List<Booking> get historyBookings => _bookings
-      .where((b) =>
-          b.status == BookingStatus.completed ||
-          b.status == BookingStatus.cancelled ||
-          b.status == BookingStatus.autoCancelled)
+      .where(
+        (b) =>
+            b.status == BookingStatus.completed ||
+            b.status == BookingStatus.cancelled ||
+            b.status == BookingStatus.autoCancelled,
+      )
       .toList();
 
   void _refreshActiveBooking() {
@@ -59,6 +79,97 @@ class ParkingStateManager extends ChangeNotifier {
     } else {
       _currentActiveBooking = null;
     }
+  }
+
+  /// Refreshes only the explicitly mapped AI lot. Other team mock lots remain
+  /// untouched until they receive their own backend integration.
+  Future<void> refreshAiOccupancy() async {
+    if (_aiRefreshing) return;
+    _aiRefreshing = true;
+    try {
+      final slots = await _aiService.fetchLotSlots(aiLotId);
+      _replaceAiLot(slots);
+      _aiError = null;
+    } catch (_) {
+      _aiError = 'Live occupancy is offline. Slot availability is unverified.';
+      final lotIndex = _lots.indexWhere((lot) => lot.id == aiLotId);
+      if (lotIndex != -1 && _lots[lotIndex].slots.isEmpty) {
+        _replaceAiLot(
+          List.generate(
+            195,
+            (index) => ParkingSlot(
+              id: '${index + 1}',
+              lotId: aiLotId,
+              row: String.fromCharCode(65 + index ~/ 15),
+              number: index + 1,
+              state: SlotState.unknown,
+              size: VehicleSize.medium,
+              walkingDistanceMeters: 20 + index * 2,
+              cameraId: 'ai-camera-1',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _aiRefreshing = false;
+      notifyListeners();
+    }
+  }
+
+  void _replaceAiLot(List<ParkingSlot> slots) {
+    final index = _lots.indexWhere((lot) => lot.id == aiLotId);
+    if (index == -1) return;
+    final lot = _lots[index];
+    _lots[index] = lot.copyWith(
+      totalSlots: slots.length,
+      freeSlots: slots.where((slot) => slot.state == SlotState.free).length,
+      slots: slots,
+    );
+  }
+
+  Future<Booking> reserveAiSlot({
+    required ParkingLot lot,
+    required ParkingSlot slot,
+    required DateTime arrivalTime,
+    required int durationHours,
+  }) async {
+    final vehicle =
+        _currentUser.defaultVehicle ??
+        const Vehicle(
+          id: 'veh-temp',
+          plateNumber: 'CAB-4821',
+          type: VehicleType.sedan,
+          size: VehicleSize.medium,
+        );
+    final response = await _aiService.reserve(
+      lotId: lot.id,
+      slotId: slot.id,
+      userId: _currentUser.id,
+      vehicleId: vehicle.id,
+      vehiclePlate: vehicle.plateNumber,
+      arrivalTime: arrivalTime,
+      durationHours: durationHours,
+    );
+    final booking = Booking(
+      id: response['id'].toString(),
+      userId: _currentUser.id,
+      vehicleId: vehicle.id,
+      vehiclePlate: vehicle.plateNumber,
+      lotId: lot.id,
+      lotName: lot.name,
+      slotId: slot.id,
+      bookedAt: DateTime.now(),
+      arrivalTime: arrivalTime,
+      durationHours: durationHours,
+      status: BookingStatus.reserved,
+      estimatedFee: lot.hourlyRate * durationHours,
+      qrToken: 'QR-${response['id']}-${slot.id}',
+    );
+    _aiBookingIds.add(booking.id);
+    _bookings.insert(0, booking);
+    _currentActiveBooking = booking;
+    await refreshAiOccupancy();
+    return booking;
   }
 
   // Auth & Profile
@@ -139,7 +250,8 @@ class ParkingStateManager extends ChangeNotifier {
     required DateTime arrivalTime,
     required int durationHours,
   }) {
-    final vehicle = _currentUser.defaultVehicle ??
+    final vehicle =
+        _currentUser.defaultVehicle ??
         const Vehicle(
           id: 'veh-temp',
           plateNumber: 'CAB-4821',
@@ -215,7 +327,8 @@ class ParkingStateManager extends ChangeNotifier {
 
     if (candidates.isNotEmpty) {
       candidates.sort(
-          (a, b) => a.walkingDistanceMeters.compareTo(b.walkingDistanceMeters));
+        (a, b) => a.walkingDistanceMeters.compareTo(b.walkingDistanceMeters),
+      );
       final bestCandidate = candidates.first;
 
       _upgradeCandidateSlot = bestCandidate;
@@ -260,8 +373,7 @@ class ParkingStateManager extends ChangeNotifier {
       _lots[lotIndex] = lot.copyWith(slots: updatedSlots);
     }
 
-    final bookingIndex =
-        _bookings.indexWhere((b) => b.id == updatedBooking.id);
+    final bookingIndex = _bookings.indexWhere((b) => b.id == updatedBooking.id);
     if (bookingIndex != -1) {
       _bookings[bookingIndex] = updatedBooking;
     }
@@ -287,7 +399,8 @@ class ParkingStateManager extends ChangeNotifier {
     _logEvent(
       bookingId: _currentActiveBooking!.id,
       type: ParkingEventType.declined,
-      description: 'Declined upgrade offer. Kept ${_currentActiveBooking!.slotId}',
+      description:
+          'Declined upgrade offer. Kept ${_currentActiveBooking!.slotId}',
     );
 
     notifyListeners();
@@ -298,7 +411,9 @@ class ParkingStateManager extends ChangeNotifier {
     if (_currentActiveBooking == null) return;
 
     final updated = _currentActiveBooking!.copyWith(
-      arrivalTime: _currentActiveBooking!.arrivalTime.add(Duration(minutes: minutes)),
+      arrivalTime: _currentActiveBooking!.arrivalTime.add(
+        Duration(minutes: minutes),
+      ),
       status: BookingStatus.extended,
       extensionFee: _currentActiveBooking!.extensionFee + fee,
     );
@@ -343,10 +458,18 @@ class ParkingStateManager extends ChangeNotifier {
   }
 
   // Cancel Booking (M6 / M8)
-  void cancelBooking({bool autoCancelled = false}) {
+  Future<void> cancelBooking({bool autoCancelled = false}) async {
     if (_currentActiveBooking == null) return;
 
     final booking = _currentActiveBooking!;
+    if (_aiBookingIds.contains(booking.id)) {
+      try {
+        await _aiService.cancel(booking.id);
+      } catch (_) {
+        return;
+      }
+      _aiBookingIds.remove(booking.id);
+    }
     final updated = booking.copyWith(
       status: autoCancelled
           ? BookingStatus.autoCancelled
@@ -387,6 +510,13 @@ class ParkingStateManager extends ChangeNotifier {
     );
 
     notifyListeners();
+    if (booking.lotId == aiLotId) await refreshAiOccupancy();
+  }
+
+  @override
+  void dispose() {
+    _aiRefreshTimer?.cancel();
+    super.dispose();
   }
 
   // Complete Payment & Exit (M11)

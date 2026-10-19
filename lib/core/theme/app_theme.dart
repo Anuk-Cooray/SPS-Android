@@ -226,8 +226,9 @@ abstract final class AppRadius {
   static const double button = 16;
   static const double sheet = 24;
   static const BorderRadius cardR = BorderRadius.all(Radius.circular(card));
-  static const BorderRadius sheetR =
-      BorderRadius.vertical(top: Radius.circular(sheet));
+  static const BorderRadius sheetR = BorderRadius.vertical(
+    top: Radius.circular(sheet),
+  );
 }
 
 abstract final class AppSize {
@@ -251,31 +252,43 @@ abstract final class AppMotion {
 abstract final class AppText {
   static const _tabular = [FontFeature.tabularFigures()];
 
-  static TextStyle get _base => GoogleFonts.manrope(
-        fontFeatures: _tabular,
-        height: 1.35,
-      );
+  static TextStyle get _base =>
+      GoogleFonts.manrope(fontFeatures: _tabular, height: 1.35);
 
   static TextStyle get display => _base.copyWith(
-      fontSize: 40, fontWeight: FontWeight.w700, letterSpacing: -1.2, height: 1.0); // ETA "12 min"
+    fontSize: 40,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -1.2,
+    height: 1.0,
+  ); // ETA "12 min"
   static TextStyle get h1 => _base.copyWith(
-      fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.56, height: 1.15);
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.56,
+    height: 1.15,
+  );
   static TextStyle get h2 => _base.copyWith(
-      fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.4);
-  static TextStyle get slotId => _base.copyWith(
-      fontSize: 22, fontWeight: FontWeight.w700);
-  static TextStyle get title => _base.copyWith(
-      fontSize: 15, fontWeight: FontWeight.w600);
-  static TextStyle get body => _base.copyWith(
-      fontSize: 14, fontWeight: FontWeight.w400, height: 1.5);
-  static TextStyle get label => _base.copyWith(
-      fontSize: 13, fontWeight: FontWeight.w600);
-  static TextStyle get caption => _base.copyWith(
-      fontSize: 12, fontWeight: FontWeight.w400);
+    fontSize: 20,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.4,
+  );
+  static TextStyle get slotId =>
+      _base.copyWith(fontSize: 22, fontWeight: FontWeight.w700);
+  static TextStyle get title =>
+      _base.copyWith(fontSize: 15, fontWeight: FontWeight.w600);
+  static TextStyle get body =>
+      _base.copyWith(fontSize: 14, fontWeight: FontWeight.w400, height: 1.5);
+  static TextStyle get label =>
+      _base.copyWith(fontSize: 13, fontWeight: FontWeight.w600);
+  static TextStyle get caption =>
+      _base.copyWith(fontSize: 12, fontWeight: FontWeight.w400);
   static TextStyle get overline => _base.copyWith(
-      fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.5);
-  static TextStyle get button => _base.copyWith(
-      fontSize: 16, fontWeight: FontWeight.w600);
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.5,
+  );
+  static TextStyle get button =>
+      _base.copyWith(fontSize: 16, fontWeight: FontWeight.w600);
 }
 
 /// ─────────────────────────────────────────────────────────────
@@ -313,7 +326,8 @@ abstract final class AppTheme {
     );
 
     final roundedBtn = RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.button));
+      borderRadius: BorderRadius.circular(AppRadius.button),
+    );
 
     return ThemeData(
       useMaterial3: true,
@@ -366,8 +380,10 @@ abstract final class AppTheme {
 
       inputDecorationTheme: InputDecorationTheme(
         filled: false,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
         hintStyle: AppText.body.copyWith(color: c.textTertiary),
         labelStyle: AppText.label.copyWith(color: c.textSecondary),
         border: OutlineInputBorder(
@@ -415,28 +431,32 @@ abstract final class AppTheme {
         elevation: 0,
         height: 64,
         indicatorColor: Colors.transparent,
-        labelTextStyle: WidgetStateProperty.resolveWith((s) =>
-            AppText.caption.copyWith(
-              fontSize: 11,
-              fontWeight: s.contains(WidgetState.selected)
-                  ? FontWeight.w600
-                  : FontWeight.w500,
-              color: s.contains(WidgetState.selected)
-                  ? c.textPrimary
-                  : c.textSecondary,
-            )),
-        iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(
-              size: 22,
-              color: s.contains(WidgetState.selected)
-                  ? c.textPrimary
-                  : c.textSecondary,
-            )),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (s) => AppText.caption.copyWith(
+            fontSize: 11,
+            fontWeight: s.contains(WidgetState.selected)
+                ? FontWeight.w600
+                : FontWeight.w500,
+            color: s.contains(WidgetState.selected)
+                ? c.textPrimary
+                : c.textSecondary,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (s) => IconThemeData(
+            size: 22,
+            color: s.contains(WidgetState.selected)
+                ? c.textPrimary
+                : c.textSecondary,
+          ),
+        ),
       ),
 
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.all(Colors.white),
-        trackColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected) ? c.primary : c.border),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.primary : c.border,
+        ),
         trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
       ),
 
@@ -450,8 +470,7 @@ abstract final class AppTheme {
         backgroundColor: c.primary,
         contentTextStyle: AppText.body.copyWith(color: c.onPrimary),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -460,7 +479,7 @@ abstract final class AppTheme {
 /// ─────────────────────────────────────────────────────────────
 /// 5. SLOT STATE HELPER (lot layout on Book Slot screen)
 /// ─────────────────────────────────────────────────────────────
-enum SlotState { free, taken, blocked, yours }
+enum SlotState { free, taken, blocked, yours, unknown }
 
 class SlotStyle {
   const SlotStyle({this.fill, this.border, required this.label});
@@ -469,19 +488,27 @@ class SlotStyle {
   final Color label;
 
   static SlotStyle of(SlotState s, AppColors c) => switch (s) {
-        SlotState.free => SlotStyle(
-            fill: c.surface,
-            border: BorderSide(color: c.slotFreeBorder, width: 1.5),
-            label: c.textSecondary),
-        SlotState.taken =>
-          SlotStyle(fill: c.slotTaken, label: c.textSecondary),
-        SlotState.blocked =>
-          SlotStyle(fill: c.slotBlocked, label: c.textTertiary), // + stripes
-        SlotState.yours => SlotStyle(
-            fill: c.accentSoft,
-            border: BorderSide(color: c.accent, width: 2),
-            label: c.accent),
-      };
+    SlotState.free => SlotStyle(
+      fill: c.surface,
+      border: BorderSide(color: c.slotFreeBorder, width: 1.5),
+      label: c.textSecondary,
+    ),
+    SlotState.taken => SlotStyle(fill: c.slotTaken, label: c.textSecondary),
+    SlotState.blocked => SlotStyle(
+      fill: c.slotBlocked,
+      label: c.textTertiary,
+    ), // + stripes
+    SlotState.yours => SlotStyle(
+      fill: c.accentSoft,
+      border: BorderSide(color: c.accent, width: 2),
+      label: c.accent,
+    ),
+    SlotState.unknown => SlotStyle(
+      fill: c.surfaceMuted,
+      border: BorderSide(color: c.border, width: 1.5),
+      label: c.textTertiary,
+    ),
+  };
 }
 
 /// ─────────────────────────────────────────────────────────────

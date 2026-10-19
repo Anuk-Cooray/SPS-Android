@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'core/theme/app_theme.dart';
 import 'data/models/booking_model.dart';
 import 'data/models/parking_lot_model.dart';
@@ -13,6 +14,7 @@ import 'features/barrier_checkin/parked_screen.dart';
 import 'features/billing/pay_and_exit_screen.dart';
 import 'features/navigation_shell.dart';
 import 'features/reoptimization/book_slot_screen.dart';
+import 'features/reoptimization/ai_slot_board_screen.dart';
 import 'features/reoptimization/late_arrival_screen.dart';
 import 'features/reoptimization/navigation_screen.dart';
 import 'features/reoptimization/upgrade_offer_screen.dart';
@@ -41,13 +43,21 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (ctx) => BookSlotScreen(
-          lot: lot,
-          onBookingConfirmed: (booking) {
-            Navigator.pop(ctx);
-            _openNavigation(context, booking);
-          },
-        ),
+        builder: (ctx) => lot.id == ParkingStateManager.aiLotId
+            ? AiSlotBoardScreen(
+                lot: lot,
+                onBooked: (booking) {
+                  Navigator.pop(ctx);
+                  _openNavigation(context, booking);
+                },
+              )
+            : BookSlotScreen(
+                lot: lot,
+                onBookingConfirmed: (booking) {
+                  Navigator.pop(ctx);
+                  _openNavigation(context, booking);
+                },
+              ),
       ),
     );
   }
@@ -68,7 +78,8 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
           onTriggerUpgradeOffer: () {
             final state = context.read<ParkingStateManager>();
             state.triggerUpgradeOfferCheck();
-            final candidate = state.upgradeCandidateSlot ??
+            final candidate =
+                state.upgradeCandidateSlot ??
                 const ParkingSlot(
                   id: 'B-01',
                   lotId: 'lot-main',
@@ -102,7 +113,9 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
                 Navigator.pop(ctx);
               },
               onRelease: () {
-                context.read<ParkingStateManager>().cancelBooking(autoCancelled: true);
+                context.read<ParkingStateManager>().cancelBooking(
+                  autoCancelled: true,
+                );
                 Navigator.pop(ctx); // close modal
                 Navigator.pop(ctx); // back to home
               },
@@ -189,9 +202,7 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
                 setState(() => _isLoggedIn = true);
               },
             ),
-      routes: {
-        '/admin': (_) => const AdminDashboardScreen(),
-      },
+      routes: {'/admin': (_) => const AdminDashboardScreen()},
     );
   }
 }

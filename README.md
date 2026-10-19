@@ -57,6 +57,44 @@ flutter run
 
 ---
 
+## YOLOv8 live occupancy integration
+
+The **Main Building Lot** is mapped to the calibrated YOLO camera board. The app
+does not run `best.pt` on Android: a local FastAPI server performs inference and
+returns the current occupancy board over the LAN.
+
+1. In a separate PowerShell terminal, start the backend (the trained model stays
+   in `S:\smart-parking-esp32\best.pt`):
+
+   ```powershell
+   cd S:\smart-parking-esp32
+   .\.venv\Scripts\python.exe -m uvicorn backend.app:app --host 0.0.0.0 --port 8000
+   ```
+
+2. Use the backend dashboard's image upload or camera capture once so a fresh
+   inference result exists. A stale or unavailable frame is deliberately shown
+   as **Unknown / Offline** and cannot be booked.
+
+3. Run Flutter with the correct backend address. For an Android emulator use
+   `10.0.2.2`; for a physical phone, replace the example with the PC's LAN IPv4
+   address. Do not commit a personal LAN address.
+
+   ```powershell
+   flutter run --dart-define=AI_API_BASE_URL=http://192.168.1.20:8000
+   ```
+
+The client refreshes `/api/board` every three seconds. Tapping an available
+green slot shows a confirmation prompt, then `POST /api/book/{slot_id}` checks
+the current backend state atomically. A 409 conflict is displayed to the user;
+occupied, booked, stale, or offline slots cannot be selected. Cancelling a
+backend-created booking calls `POST /api/bookings/{booking_ref}/cancel`.
+
+The backend camera calibration is authoritative. Do not reuse the supplied
+MetaPKLot polygons with a different camera position; recalibrate on the backend
+first.
+
+---
+
 ## Design System Guidelines
 * **Palette**: Monochrome (`#0A0A0A` text/buttons, `#FFFFFF` surface) with one blue accent (`#2563EB` light, `#3B82F6` dark) reserved strictly for the user's allocated slot and upgrade notifications.
 * **Typography**: Google Fonts `Manrope` with tabular figures for real-time counters, timers, and fees.
