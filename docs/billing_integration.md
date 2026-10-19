@@ -1,3 +1,7 @@
+> Update: local SQLite persistence and paid-only exit-token issue/consume endpoints
+> are implemented. See [the current contract](billing_50_percent.md). The future
+> platform database and hardware integration remain team decisions.
+
 # Component 4 integration hand-off
 
 This is a contract proposal for the next increment, not a claim that analytics
@@ -50,22 +54,22 @@ that endpoint. This increment deliberately does not alter his dashboard.
 
 ## Booking and barrier hand-off
 
-The screen calls the existing completion callback only for a paid invoice matching
-its booking ID. The current ParkingStateManager.completePayment targets the
+The screen calls the existing completion callback only on Finish demo exit for a
+paid invoice matching its booking ID with an unexpired pass. The current ParkingStateManager.completePayment targets the
 current active booking; team integration should provide explicit booking-ID
 settlement before supporting multiple simultaneous visits robustly. It currently
 records completedAt/finalFee and releases a slot; no physical barrier opens here.
 
-A future exit-token endpoint must issue a signed, short-lived token only after
-paid status, with atomic single-use consumption by Varunprasath's BarrierService.
-The displayed invoice QR and existing booking entry QR are not that authorization.
-Agree verification keys, replay storage and barrier acknowledgment together.
+Billing now issues signed, five-minute paid exit passes and exposes authenticated,
+atomic single-use consumption. Varunprasath's backend still needs to integrate
+that contract with hardware and agree the acknowledgment/recovery protocol.
+Unpaid invoice-reference QRs and booking entry QRs cannot authorize paid exit.
 
 ## Decisions still open
 
 - Platform diagrams show MongoDB + Node.js/Firebase, while this component uses
   FastAPI and proposes PostgreSQL. Keep the current repository interface and
-  in-memory demo until the team decides; no database choice was silently resolved.
+  local SQLite adapter until the team decides the production store.
 - Supervisor approval is needed for rates, grace, blocks, peak windows, demand
   curve, daily cap, overtime, arrival-fee treatment and exit-hour surge policy.
 - Booking charges must move to a server-authoritative source. Production must

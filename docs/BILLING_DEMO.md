@@ -32,15 +32,15 @@ Git and the shell exports apply only to the current terminal.
 ## Five-minute supervisor demo
 
 1. **0:00–1:00 — App architecture.** Show BillingService, its separate Provider
-   state, immutable models and the single useBackend=false service toggle.
+   state, immutable models and the BILLING_USE_BACKEND compile-time service toggle.
 2. **1:00–2:00 — Frontend.** Open the active booking, follow navigation → Show QR
    → check in/confirm parked → Pay and exit. The booking must have checkedInAt.
    Show actual duration, monochrome breakdown, recorded arrival fee/upgrade and
    synthetic demand chart. An immediate exit may cost zero due to grace.
 3. **2:00–3:00 — Payment semantics.** Choose Pay at booth (guard): it stays unpaid
    and shows an invoice-reference QR. Choose a sandbox digital option for the
-   offline simulation. Explain that invoice confirmation, not a fake timer, ends
-   the booking and that barrier hardware is not integrated.
+   offline simulation. Explain that payment confirmation reveals an exit pass; Finish demo exit ends
+   the demo booking and that barrier hardware is not integrated.
 4. **3:00–4:00 — Backend.** Start it below, open /docs and show quote/invoice/status
    routes. Run demo_mock_payment.py for the separate offline API payment workflow.
 5. **4:00–5:00 — Forecast and evidence.** Show metrics.json and forecast_demo.png,
@@ -70,14 +70,13 @@ Open http://127.0.0.1:8000/docs on the computer. In another terminal from backen
 /private/tmp/sps-billing-venv/bin/python demo_mock_payment.py
 ```
 
-Keys can remain blank. For HTTP frontend mode, set useBackend=true in
-lib/data/services/billing/billing_service_factory.dart and rebuild. Android
+Keys can remain blank. For HTTP frontend mode, run `flutter run -d emulator-5554 --dart-define=BILLING_USE_BACKEND=true`. Android
 emulator calls the computer at http://10.0.2.2:8000. Physical devices need a
 reachable host address or HTTPS tunnel via BILLING_BASE_URL. See backend/README.md
 for sandbox credentials, callbacks and currency configuration. The screen does
 not embed real provider checkout clients; start/refresh and mock mode are the
 milestone integration. Close an old app/server session before starting another;
-invoice storage is process-local and lost on restart.
+backend invoice storage persists in ignored SQLite files across restart.
 
 ## Verification commands
 
@@ -91,8 +90,13 @@ flutter test --no-pub
 /private/tmp/sps-billing-venv/bin/black --check backend
 ```
 
-Latest verified: 36 Flutter tests, 124 backend tests, clean Flutter analysis and
+Previous milestone verified: 36 Flutter tests, 124 backend tests, clean Flutter analysis and
 Black/Ruff. Android debug APK built and launched on Pixel API 36. The backend
 suite has one existing Starlette/httpx deprecation warning. Optional Prophet and
 external sandbox transactions were not run; scikit-learn fallback and signed
 webhook fixtures were tested.
+
+
+For the new persistence, in-app mock confirmation and exit-pass demo, follow
+[billing_50_percent.md](billing_50_percent.md). These additions supersede the old
+terminal-only mock confirmation instructions above.
