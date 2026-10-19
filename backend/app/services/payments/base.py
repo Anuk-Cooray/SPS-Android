@@ -26,6 +26,7 @@ class VerifiedPayment:
     currency: str
     status: str
     invoice_id: str | None = None
+    confirmation_token: str | None = None
 
 
 class PaymentProvider(ABC):

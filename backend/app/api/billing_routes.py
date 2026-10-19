@@ -1,3 +1,5 @@
+import hmac
+import os
 from datetime import timezone
 from typing import Annotated
 
@@ -6,13 +8,16 @@ from fastapi.responses import PlainTextResponse
 
 from app.core.config import LOT_RATES, is_debug
 from app.schemas.billing import (
+    ConsumeExitTokenRequest,
     CreateInvoiceRequest,
+    ExitToken,
     FeeQuote,
     Invoice,
     PaymentRequest,
     PaymentSession,
     QuoteRequest,
 )
+from app.services.exit_token_service import ExitTokenService
 from app.services.forecast_service import ForecastService, get_forecast_service
 from app.services.invoice_service import InvoiceService, get_invoice_service
 from app.services.payments.base import PaymentError, WebhookRequest
@@ -146,3 +151,29 @@ async def mock_webhook(request: Request, service: InvoiceDependency) -> dict:
 @router.get("/payment-return", response_class=PlainTextResponse)
 def payment_return() -> str:
     return "Sandbox checkout returned. Return to the app and refresh the invoice. This redirect does not confirm payment."
+
+
+@router.get("/bookings/{booking_id}/invoice", response_model=Invoice)
+def booking_invoice(booking_id: str, service: InvoiceDependency) -> Invoice:
+    invoice = service.repository.find_booking_invoice(booking_id)
+    if invoice is None:
+        raise PaymentError("INVOICE_NOT_FOUND", "Invoice not found", 404)
+    return invoice
+
+
+@router.get("/invoices/{invoice_id}/exit-token", response_model=ExitToken)
+def issue_exit_token(invoice_id: str, service: InvoiceDependency) -> ExitToken:
+    return ExitTokenService(service.repository).issue(invoice_id)
+
+
+@router.post("/exit-tokens/consume")
+def consume_exit_token(
+    payload: ConsumeExitTokenRequest, request: Request, service: InvoiceDependency
+) -> dict:
+    key = os.getenv("BARRIER_INTEGRATION_KEY", "")
+    supplied = request.headers.get("X-Barrier-Key", "")
+    if not key or not hmac.compare_digest(key.encode(), supplied.encode()):
+        raise PaymentError(
+            "BARRIER_AUTH_REQUIRED", "Barrier integration key required", 403
+        )
+    return ExitTokenService(service.repository).consume(payload.token)

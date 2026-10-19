@@ -1,14 +1,17 @@
 """Invoice transitions and verified settlement, independent of HTTP handlers."""
 
+import hmac
+import os
 from functools import lru_cache
+from pathlib import Path
 from threading import RLock
 from uuid import uuid4
 
 from app.core.config import PaymentSettings
 from app.repositories.invoice_repository import (
-    InMemoryInvoiceRepository,
     InvoiceRepository,
 )
+from app.repositories.sqlite_invoice_repository import SqliteInvoiceRepository
 from app.schemas.billing import FeeQuote, Invoice, PaymentSession
 from app.services.payments.base import PaymentError, PaymentProvider, WebhookRequest
 from app.services.payments.mock_provider import MockProvider
@@ -26,11 +29,11 @@ class InvoiceService:
         self._lock = RLock()
 
     def remember_quote(self, quote: FeeQuote) -> None:
-        with self._lock:
+        with self._lock, self.repository.transaction():
             self.repository.remember_quote(quote)
 
     def create_invoice(self, booking_id: str, quote: FeeQuote) -> Invoice:
-        with self._lock:
+        with self._lock, self.repository.transaction():
             if quote.booking_id != booking_id or not self.repository.issued_quote(
                 quote
             ):
@@ -101,7 +104,7 @@ class InvoiceService:
     def start_payment(self, invoice_id: str, method: str) -> PaymentSession:
         if method not in {"payhere", "stripe", "guard"}:
             raise PaymentError("INVALID_METHOD", "Unsupported payment method", 422)
-        with self._lock:
+        with self._lock, self.repository.transaction():
             invoice = self.get_invoice(invoice_id)
             previous = self.repository.latest_session(invoice_id)
             if invoice.status == "paid":
@@ -161,7 +164,7 @@ class InvoiceService:
             return session
 
     def handle_webhook(self, provider_name: str, request: WebhookRequest) -> dict:
-        with self._lock:
+        with self._lock, self.repository.transaction():
             provider = (
                 self._mock if provider_name == "mock" else self._provider(provider_name)
             )
@@ -179,6 +182,14 @@ class InvoiceService:
                 raise PaymentError(
                     "SESSION_NOT_FOUND", "Payment session not found", 404
                 )
+            if provider_name == "mock" and (
+                not session.mock_webhook_token
+                or not hmac.compare_digest(
+                    session.mock_webhook_token.encode(),
+                    (event.confirmation_token or "").encode(),
+                )
+            ):
+                raise PaymentError("INVALID_WEBHOOK", "Invalid mock confirmation token")
             if (
                 session.provider != provider_name
                 or session.provider_payment_id != event.provider_payment_id
@@ -218,4 +229,7 @@ class InvoiceService:
 
 @lru_cache(maxsize=1)
 def get_invoice_service() -> InvoiceService:
-    return InvoiceService(InMemoryInvoiceRepository(), PaymentSettings.from_env())
+    settings = PaymentSettings.from_env()
+    default = Path(__file__).resolve().parents[2] / ".data" / "billing.sqlite3"
+    path = Path(os.getenv("BILLING_DB_PATH", str(default)))
+    return InvoiceService(SqliteInvoiceRepository(path), settings)

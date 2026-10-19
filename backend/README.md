@@ -1,7 +1,7 @@
 # Component 4 billing milestone backend
 
 Steps 3–6 provide a pure pricing engine, a synthetic-data baseline pipeline, and
-FastAPI quote/forecast endpoints, in-memory invoices and sandbox payment adapters.
+FastAPI quote/forecast endpoints, persistent local SQLite invoices and sandbox payment adapters.
 No credentials are needed for the current API; generate/train the model before
 requesting forecasts or quotes that omit demand.
 
@@ -214,9 +214,10 @@ and OpenAPI returned HTTP 200. No production payment behavior is implemented; St
 ## Step 6: sandbox payments and offline settlement
 
 Copy `.env.example` to `backend/.env`; leave all keys blank for the offline demo.
-Never commit `.env`. Run **one API worker**: invoices, issued quotes, sessions and
-webhook deduplication are held in memory and lost on reload/restart. PostgreSQL
-versus MongoDB remains the team's decision; `InvoiceRepository` is the boundary.
+Never commit `.env`. Local SQLite now persists invoices, issued quotes, sessions,
+webhook deduplication and exit grants across restarts under `backend/.data/`.
+Use `BILLING_DB_PATH` to override the file. PostgreSQL versus MongoDB remains the
+team's production decision; `InvoiceRepository` is the boundary.
 No authentication or ownership checks exist in this local milestone API.
 
 ```sh
@@ -394,15 +395,28 @@ invoice is confirmed. The screen offers Check status and never treats a checkout
 URL, QR or redirect as paid. PayHere form submission and Stripe SDK/Elements
 confirmation are not embedded in this milestone screen; complete those sandbox
 sessions using the configured provider test client, then refresh. For missing-key
-backend mock sessions, use the DEBUG-only callback with that session's token and
-invoice ID. Starting the same invoice/method again through `/pay` returns the
+backend mock sessions, tap Confirm mock in the app (DEBUG=true required). Starting the same invoice/method again through `/pay` returns the
 existing session, including its mock callback fields. Do not use the standalone
 demo script to confirm a different screen invoice: it creates a fresh booking.
 
-Within the current app process, HTTP state resumes an already created invoice
-instead of repricing it while checkout is pending. Neither app nor backend invoice
-identity persists across restart; recovery and invoice amendments remain future
-work. No real card, exit token or barrier operation is provided. Android release
+HTTP state resumes an already created invoice instead of repricing it while
+checkout is pending. A fresh HTTP client recovers invoice identity by booking
+from SQLite after restart. Invoice amendments
+remain future work. Paid invoices now receive five-minute signed exit passes;
+barrier hardware and real card checkout remain team integration work. Android release
 network permissions/HTTP policy and iOS transport exceptions are outside the
 billing ownership scope; use HTTPS for deployments. No platform manifest was
 edited in this step.
+
+
+## Current increment toward the 50% milestone
+
+See `../docs/billing_50_percent.md` for acceptance criteria and the complete demo.
+`GET /api/v1/billing/bookings/{booking_id}/invoice` recovers a stored invoice.
+`GET /api/v1/billing/invoices/{invoice_id}/exit-token` requires a paid invoice.
+`POST /api/v1/billing/exit-tokens/consume` takes `{"token":"..."}` and requires
+`X-Barrier-Key` matching `BARRIER_INTEGRATION_KEY`. It atomically accepts the latest
+unexpired pass once; it does not operate a gate. Never put this shared key in the app.
+Expired unused passes can be renewed; consumed invoices cannot receive another pass.
+The HMAC key and grants persist in SQLite. Keep the database private and backed up.
+The API still needs booking ownership authentication before deployment.

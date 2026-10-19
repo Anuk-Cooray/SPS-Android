@@ -80,3 +80,24 @@ class PaymentSession(BaseModel):
     client_secret: str | None = None
     mock_webhook_token: str | None = None
     message: str
+
+
+class ExitGrant(BaseModel):
+    """Stored token ledger entry; only the public subset is returned by routes."""
+
+    nonce: str
+    invoice_id: str
+    token: str
+    expires_at: AwareDatetime
+    used_at: AwareDatetime | None = None
+
+
+class ExitToken(BaseModel):
+    invoice_id: str
+    token: str
+    expires_at: AwareDatetime
+    is_mock: bool = False
+
+
+class ConsumeExitTokenRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=4096)

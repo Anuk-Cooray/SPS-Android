@@ -1,9 +1,13 @@
-"""Storage boundary; replace the memory implementation after the DB decision."""
+"""Storage boundary for local SQLite and isolated in-memory test adapters."""
 
+import secrets
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from contextlib import contextmanager
 from hashlib import sha256
+from threading import RLock
 
-from app.schemas.billing import FeeQuote, Invoice, PaymentSession
+from app.schemas.billing import ExitGrant, FeeQuote, Invoice, PaymentSession
 
 
 def quote_key(quote: FeeQuote) -> str:
@@ -11,6 +15,23 @@ def quote_key(quote: FeeQuote) -> str:
 
 
 class InvoiceRepository(ABC):
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Memory storage uses the service lock; database adapters override this."""
+        yield
+
+    @abstractmethod
+    def get_or_create_signing_key(self) -> bytes: ...
+
+    @abstractmethod
+    def save_exit_grant(self, grant: ExitGrant) -> None: ...
+
+    @abstractmethod
+    def get_exit_grant(self, nonce: str) -> ExitGrant | None: ...
+
+    @abstractmethod
+    def latest_exit_grant(self, invoice_id: str) -> ExitGrant | None: ...
+
     @abstractmethod
     def remember_quote(self, quote: FeeQuote) -> None: ...
 
@@ -43,15 +64,23 @@ class InvoiceRepository(ABC):
 
 
 class InMemoryInvoiceRepository(InvoiceRepository):
-    """Accessed under InvoiceService's lock; not shared across API workers."""
+    """Transaction lock for local services; not shared across API workers."""
 
     def __init__(self) -> None:
+        self._lock = RLock()
+        self._signing_key = secrets.token_bytes(32)
+        self._grants: dict[str, ExitGrant] = {}
         self._quotes: set[str] = set()
         self._invoices: dict[str, Invoice] = {}
         self._bookings: dict[str, str] = {}
         self._sessions: dict[str, PaymentSession] = {}
         self._latest: dict[str, str] = {}
         self._events: set[tuple[str, str]] = set()
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        with self._lock:
+            yield
 
     def remember_quote(self, quote: FeeQuote) -> None:
         self._quotes.add(quote_key(quote))
@@ -87,3 +116,19 @@ class InMemoryInvoiceRepository(InvoiceRepository):
 
     def remember_event(self, provider: str, event_id: str) -> None:
         self._events.add((provider, event_id))
+
+    def get_or_create_signing_key(self) -> bytes:
+        return self._signing_key
+
+    def save_exit_grant(self, grant: ExitGrant) -> None:
+        self._grants[grant.nonce] = grant.model_copy(deep=True)
+
+    def get_exit_grant(self, nonce: str) -> ExitGrant | None:
+        grant = self._grants.get(nonce)
+        return grant.model_copy(deep=True) if grant else None
+
+    def latest_exit_grant(self, invoice_id: str) -> ExitGrant | None:
+        matches = [
+            grant for grant in self._grants.values() if grant.invoice_id == invoice_id
+        ]
+        return matches[-1].model_copy(deep=True) if matches else None

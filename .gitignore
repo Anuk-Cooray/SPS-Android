@@ -68,3 +68,9 @@ backend/.mplconfig/
 
 # Project-local Flutter SDK (developer tooling, not application source)
 .tools/flutter/
+
+# Local persistent billing state (contains sessions and signing keys)
+backend/.data/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

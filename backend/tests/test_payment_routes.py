@@ -150,6 +150,7 @@ def test_invoice_creation_retry_reuses_same_invoice(client):
     "changes",
     [
         {"token": "bad"},
+        {"token": "\u2603"},
         {"amount_minor": 1},
         {"currency": "USD"},
         {"amount_minor": True},
