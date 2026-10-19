@@ -39,6 +39,10 @@ class Booking {
   final DateTime? checkedInAt;
   final DateTime? completedAt;
   final DateTime? holdExpiresAt;
+  final double predictedEtaMinBaseline;
+  final double predictedEtaMinProvider;
+  final double predictedEtaMinCorrected;
+  final String modelVersion;
 
   const Booking({
     required this.id,
@@ -61,6 +65,10 @@ class Booking {
     this.checkedInAt,
     this.completedAt,
     this.holdExpiresAt,
+    this.predictedEtaMinBaseline = 0.0,
+    this.predictedEtaMinProvider = 0.0,
+    this.predictedEtaMinCorrected = 0.0,
+    this.modelVersion = 'v1.0.0-linear',
   });
 
   DateTime get cancelDeadline => arrivalTime.add(const Duration(minutes: 15));
@@ -126,6 +134,10 @@ class Booking {
     DateTime? checkedInAt,
     DateTime? completedAt,
     DateTime? holdExpiresAt,
+    double? predictedEtaMinBaseline,
+    double? predictedEtaMinProvider,
+    double? predictedEtaMinCorrected,
+    String? modelVersion,
   }) {
     return Booking(
       id: id ?? this.id,
@@ -148,6 +160,13 @@ class Booking {
       checkedInAt: checkedInAt ?? this.checkedInAt,
       completedAt: completedAt ?? this.completedAt,
       holdExpiresAt: holdExpiresAt ?? this.holdExpiresAt,
+      predictedEtaMinBaseline:
+          predictedEtaMinBaseline ?? this.predictedEtaMinBaseline,
+      predictedEtaMinProvider:
+          predictedEtaMinProvider ?? this.predictedEtaMinProvider,
+      predictedEtaMinCorrected:
+          predictedEtaMinCorrected ?? this.predictedEtaMinCorrected,
+      modelVersion: modelVersion ?? this.modelVersion,
     );
   }
 
@@ -172,6 +191,10 @@ class Booking {
         'checkedInAt': checkedInAt?.toIso8601String(),
         'completedAt': completedAt?.toIso8601String(),
         'holdExpiresAt': holdExpiresAt?.toIso8601String(),
+        'predictedEtaMinBaseline': predictedEtaMinBaseline,
+        'predictedEtaMinProvider': predictedEtaMinProvider,
+        'predictedEtaMinCorrected': predictedEtaMinCorrected,
+        'modelVersion': modelVersion,
       };
 
   static DateTime? _parseDate(dynamic val) {
@@ -218,6 +241,13 @@ class Booking {
       checkedInAt: _parseDate(json['checkedInAt']),
       completedAt: _parseDate(json['completedAt']),
       holdExpiresAt: _parseDate(json['holdExpiresAt']),
+      predictedEtaMinBaseline:
+          (json['predictedEtaMinBaseline'] as num?)?.toDouble() ?? 0.0,
+      predictedEtaMinProvider:
+          (json['predictedEtaMinProvider'] as num?)?.toDouble() ?? 0.0,
+      predictedEtaMinCorrected:
+          (json['predictedEtaMinCorrected'] as num?)?.toDouble() ?? 0.0,
+      modelVersion: json['modelVersion'] as String? ?? 'v1.0.0-linear',
     );
   }
 }

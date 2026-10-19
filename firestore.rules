@@ -47,6 +47,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /trip_telemetry/{telemetryId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isOwner(resource.data.userId));
+      allow write: if false;
+    }
+
     // User Profiles: Only owner can read/write their own profile
     match /users/{userId} {
       allow read, write: if isOwner(userId);

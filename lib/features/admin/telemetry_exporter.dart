@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import '../../data/models/parking_event_model.dart';
 import '../../data/models/parking_lot_model.dart';
+import '../../data/models/trip_telemetry_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/vehicle_model.dart';
 import '../../features/reoptimization/engine/reoptimization_engine.dart';
@@ -47,7 +48,8 @@ abstract final class TelemetryExporter {
         },
         'upgrade_thresholds': {
           'min_distance_improvement_meters': weights.minImprovementMeters,
-          'min_score_improvement_percent': weights.minScoreImprovementPercent,
+          'min_score_improvement_points': weights.minScoreImprovementPoints,
+          'min_score_improvement_percent': weights.minScoreImprovementPoints,
           'offer_timeout_seconds': weights.offerTimeoutSeconds,
           'upgrade_trigger_eta_minutes': weights.upgradeTriggerEtaMinutes,
         },
@@ -109,6 +111,31 @@ abstract final class TelemetryExporter {
           '$eligible,$isRecommended',
         );
       }
+    }
+
+    return buffer.toString();
+  }
+
+  /// Converts completed trip telemetry audit records to standard CSV for offline ML model training
+  static String tripsToCsv(List<TripTelemetry> trips) {
+    final buffer = StringBuffer();
+    buffer.writeln(
+      'trip_id,booking_id,user_id,lot_id,predicted_eta_baseline,predicted_eta_provider,'
+      'predicted_eta_corrected,actual_travel_min,departure_time,arrival_time,day_of_week,'
+      'hour,distance_km,origin_zone,weather_flag,holiday_flag,model_version,logged_at',
+    );
+
+    for (final trip in trips) {
+      buffer.writeln(
+        '${_escapeCsv(trip.tripId)},${_escapeCsv(trip.bookingId)},${_escapeCsv(trip.userId)},'
+        '${_escapeCsv(trip.lotId)},${trip.predictedEtaMinBaseline.toStringAsFixed(1)},'
+        '${trip.predictedEtaMinProvider.toStringAsFixed(1)},'
+        '${trip.predictedEtaMinCorrected.toStringAsFixed(1)},${trip.actualTravelMin},'
+        '${trip.departureTime.toIso8601String()},${trip.arrivalTime.toIso8601String()},'
+        '${trip.dayOfWeek},${trip.hour},${trip.distanceKm.toStringAsFixed(2)},'
+        '${_escapeCsv(trip.originZone)},${trip.weatherFlag},${trip.holidayFlag},'
+        '${_escapeCsv(trip.modelVersion)},${trip.loggedAt.toIso8601String()}',
+      );
     }
 
     return buffer.toString();

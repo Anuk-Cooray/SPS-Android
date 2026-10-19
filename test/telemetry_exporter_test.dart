@@ -4,6 +4,7 @@ import 'package:smart_parking/core/theme/app_theme.dart';
 import 'package:smart_parking/data/models/parking_event_model.dart';
 import 'package:smart_parking/data/models/parking_lot_model.dart';
 import 'package:smart_parking/data/models/parking_slot_model.dart';
+import 'package:smart_parking/data/models/trip_telemetry_model.dart';
 import 'package:smart_parking/data/models/user_model.dart';
 import 'package:smart_parking/data/models/vehicle_model.dart';
 import 'package:smart_parking/features/admin/telemetry_export_modal.dart';
@@ -185,6 +186,100 @@ void main() {
       expect(ExportDatasetType.benchmarkJson.fileExtension, 'json');
       expect(ExportDatasetType.scoresMatrixCsv.title, 'Bay Scores (CSV)');
       expect(ExportDatasetType.scoresMatrixCsv.fileExtension, 'csv');
+    });
+
+    test('eventsToJson includes min_score_improvement_points in upgrade thresholds', () {
+      final jsonString = TelemetryExporter.eventsToJson(
+        events: sampleEvents,
+        weights: weights,
+      );
+      final data = jsonDecode(jsonString) as Map<String, dynamic>;
+      final thresholds = (data['model_hyperparameters'] as Map<String, dynamic>)['upgrade_thresholds'] as Map<String, dynamic>;
+      expect(thresholds['min_score_improvement_points'], 20.0);
+      expect(thresholds['min_score_improvement_percent'], 20.0);
+    });
+
+    test('tripsToCsv exports valid RFC-4180 CSV with trip telemetry columns', () {
+      final sampleTrips = [
+        TripTelemetry(
+          id: 'TRIP-BK-1001',
+          tripId: 'TRIP-BK-1001',
+          bookingId: 'BK-1001',
+          userId: 'user-001',
+          lotId: 'lot-main',
+          predictedEtaMinBaseline: 15.0,
+          predictedEtaMinProvider: 12.0,
+          predictedEtaMinCorrected: 13.8,
+          actualTravelMin: 14,
+          departureTime: DateTime.parse('2026-10-19T08:30:00Z'),
+          arrivalTime: DateTime.parse('2026-10-19T08:44:00Z'),
+          dayOfWeek: 1,
+          hour: 8,
+          distanceKm: 5.2,
+          originZone: 'Malabe_Kaduwela',
+          weatherFlag: 0,
+          holidayFlag: 0,
+          modelVersion: 'v1.0.0-linear',
+          loggedAt: DateTime.parse('2026-10-19T08:44:05Z'),
+        ),
+      ];
+
+      final csv = TelemetryExporter.tripsToCsv(sampleTrips);
+      expect(csv, isNotEmpty);
+      final lines = csv.trim().split('\n');
+      expect(lines.length, 2); // 1 header + 1 trip row
+
+      final header = lines[0].trim();
+      expect(header, contains('trip_id'));
+      expect(header, contains('predicted_eta_baseline'));
+      expect(header, contains('predicted_eta_provider'));
+      expect(header, contains('predicted_eta_corrected'));
+      expect(header, contains('actual_travel_min'));
+      expect(header, contains('model_version'));
+
+      final row = lines[1];
+      expect(row, contains('TRIP-BK-1001'));
+      expect(row, contains('15.0'));
+      expect(row, contains('12.0'));
+      expect(row, contains('13.8'));
+      expect(row, contains('14'));
+      expect(row, contains('v1.0.0-linear'));
+    });
+
+    test('TripTelemetry serializes and deserializes correctly', () {
+      final trip = TripTelemetry(
+        id: 'T-1',
+        tripId: 'T-1',
+        bookingId: 'BK-99',
+        userId: 'U-1',
+        lotId: 'L-1',
+        predictedEtaMinBaseline: 16.0,
+        predictedEtaMinProvider: 11.5,
+        predictedEtaMinCorrected: 14.2,
+        actualTravelMin: 15,
+        departureTime: DateTime.parse('2026-10-19T09:00:00Z'),
+        arrivalTime: DateTime.parse('2026-10-19T09:15:00Z'),
+        dayOfWeek: 2,
+        hour: 9,
+        distanceKm: 4.8,
+        originZone: 'Kollupitiya_Bambalapitiya',
+        weatherFlag: 1,
+        holidayFlag: 0,
+        modelVersion: 'v1.0.0-linear',
+        loggedAt: DateTime.parse('2026-10-19T09:15:02Z'),
+      );
+
+      final json = trip.toJson();
+      final fromJson = TripTelemetry.fromJson(json);
+
+      expect(fromJson.tripId, trip.tripId);
+      expect(fromJson.predictedEtaMinBaseline, 16.0);
+      expect(fromJson.predictedEtaMinProvider, 11.5);
+      expect(fromJson.predictedEtaMinCorrected, 14.2);
+      expect(fromJson.actualTravelMin, 15);
+      expect(fromJson.originZone, 'Kollupitiya_Bambalapitiya');
+      expect(fromJson.weatherFlag, 1);
+      expect(fromJson.modelVersion, 'v1.0.0-linear');
     });
   });
 }

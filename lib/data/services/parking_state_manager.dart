@@ -15,6 +15,7 @@ import '../models/parking_lot_model.dart';
 import '../models/parking_slot_model.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
+import 'arrival_feasibility_service.dart';
 import 'cloud_functions_client.dart';
 import 'firestore_service.dart';
 import 'mock_data.dart';
@@ -506,7 +507,10 @@ class ParkingStateManager extends ChangeNotifier {
 
     _bookings.insert(0, newBooking);
     _currentActiveBooking = newBooking;
-    _etaMinutes = _initialEtaMinutes;
+    final initialEta = newBooking.predictedEtaMinCorrected > 0
+        ? newBooking.predictedEtaMinCorrected.round()
+        : _initialEtaMinutes;
+    _etaMinutes = initialEta;
     _distanceKm = _initialDistanceKm;
     _routeProgress = 0.0;
     _hasTriggeredAutoUpgrade = false;
@@ -518,6 +522,14 @@ class ParkingStateManager extends ChangeNotifier {
       bookingId: newBooking.id,
       type: ParkingEventType.booked,
       description: 'Booked slot ${slot.id} in ${lot.name} · Hold expires in 15 mins',
+      metadata: {
+        'lotId': lot.id,
+        'slotId': slot.id,
+        'predictedEtaMinBaseline': newBooking.predictedEtaMinBaseline,
+        'predictedEtaMinProvider': newBooking.predictedEtaMinProvider,
+        'predictedEtaMinCorrected': newBooking.predictedEtaMinCorrected,
+        'modelVersion': newBooking.modelVersion,
+      },
     );
 
     notifyListeners();
@@ -540,6 +552,15 @@ class ParkingStateManager extends ChangeNotifier {
           size: VehicleSize.medium,
         );
 
+    final feasibility = (originLat != null && originLng != null)
+        ? ArrivalFeasibilityService.evaluate(
+            originLat: originLat,
+            originLng: originLng,
+            targetLot: lot,
+            requestedTime: arrivalTime,
+          )
+        : null;
+
     final holdExpiry = arrivalTime.add(const Duration(minutes: 15));
     final newBooking = Booking(
       id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
@@ -556,6 +577,10 @@ class ParkingStateManager extends ChangeNotifier {
       estimatedFee: lot.hourlyRate * durationHours,
       qrToken: 'QR-TOKEN-${slot.id}-${DateTime.now().millisecondsSinceEpoch}',
       holdExpiresAt: holdExpiry,
+      predictedEtaMinBaseline: feasibility?.predictedEtaMinBaseline ?? 0.0,
+      predictedEtaMinProvider: feasibility?.predictedEtaMinProvider ?? 0.0,
+      predictedEtaMinCorrected: feasibility?.predictedEtaMinCorrected ?? 0.0,
+      modelVersion: feasibility?.modelVersion ?? 'v1.0.0-linear',
     );
 
     _applyLocalBooking(newBooking, lot, slot);
@@ -573,6 +598,11 @@ class ParkingStateManager extends ChangeNotifier {
         durationHours: durationHours,
         originLat: originLat,
         originLng: originLng,
+        providerEtaMinutes: feasibility?.predictedEtaMinProvider,
+        predictedEtaMinBaseline: feasibility?.predictedEtaMinBaseline,
+        predictedEtaMinProvider: feasibility?.predictedEtaMinProvider,
+        predictedEtaMinCorrected: feasibility?.predictedEtaMinCorrected,
+        modelVersion: feasibility?.modelVersion ?? 'v1.0.0-linear',
       ).then((serverBooking) {
         final idx = _bookings.indexWhere((b) => b.id == newBooking.id);
         if (idx != -1) {
@@ -611,6 +641,15 @@ class ParkingStateManager extends ChangeNotifier {
           size: VehicleSize.medium,
         );
 
+    final feasibility = (driverOriginLat != null && driverOriginLng != null)
+        ? ArrivalFeasibilityService.evaluate(
+            originLat: driverOriginLat,
+            originLng: driverOriginLng,
+            targetLot: lot,
+            requestedTime: arrivalTime,
+          )
+        : null;
+
     try {
       Booking booking;
       if (!_isTestRuntime && _firestore.isAvailable) {
@@ -625,6 +664,11 @@ class ParkingStateManager extends ChangeNotifier {
           durationHours: durationHours,
           originLat: driverOriginLat,
           originLng: driverOriginLng,
+          providerEtaMinutes: feasibility?.predictedEtaMinProvider,
+          predictedEtaMinBaseline: feasibility?.predictedEtaMinBaseline,
+          predictedEtaMinProvider: feasibility?.predictedEtaMinProvider,
+          predictedEtaMinCorrected: feasibility?.predictedEtaMinCorrected,
+          modelVersion: feasibility?.modelVersion ?? 'v1.0.0-linear',
         );
       } else {
         final holdExpiry = arrivalTime.add(const Duration(minutes: 15));
@@ -643,6 +687,10 @@ class ParkingStateManager extends ChangeNotifier {
           estimatedFee: lot.hourlyRate * durationHours,
           qrToken: 'QR-TOKEN-${slot.id}-${DateTime.now().millisecondsSinceEpoch}',
           holdExpiresAt: holdExpiry,
+          predictedEtaMinBaseline: feasibility?.predictedEtaMinBaseline ?? 0.0,
+          predictedEtaMinProvider: feasibility?.predictedEtaMinProvider ?? 0.0,
+          predictedEtaMinCorrected: feasibility?.predictedEtaMinCorrected ?? 0.0,
+          modelVersion: feasibility?.modelVersion ?? 'v1.0.0-linear',
         );
       }
 
@@ -936,6 +984,10 @@ class ParkingStateManager extends ChangeNotifier {
     if (idx != -1) {
       _bookings[idx] = updated;
     }
+    final actualTravelMin = updated.checkedInAt != null
+        ? updated.checkedInAt!.difference(updated.bookedAt).inMinutes
+        : 0;
+
     _currentActiveBooking = updated;
     _firestore.saveBooking(updated);
 
@@ -943,6 +995,7 @@ class ParkingStateManager extends ChangeNotifier {
       unawaited(_firestore.checkInOnServer(
         qrToken: updated.qrToken,
         bookingId: updated.id,
+        actualTravelMin: actualTravelMin,
       ));
     }
 
@@ -950,6 +1003,15 @@ class ParkingStateManager extends ChangeNotifier {
       bookingId: updated.id,
       type: ParkingEventType.checkedIn,
       description: 'Vehicle checked in at barrier for slot ${updated.slotId}',
+      metadata: {
+        'slotId': updated.slotId,
+        'lotId': updated.lotId,
+        'predictedEtaMinBaseline': updated.predictedEtaMinBaseline,
+        'predictedEtaMinProvider': updated.predictedEtaMinProvider,
+        'predictedEtaMinCorrected': updated.predictedEtaMinCorrected,
+        'actualTravelMin': actualTravelMin,
+        'modelVersion': updated.modelVersion,
+      },
     );
 
     _stopHoldTimer();
@@ -1192,6 +1254,7 @@ class ParkingStateManager extends ChangeNotifier {
     required String bookingId,
     required ParkingEventType type,
     required String description,
+    Map<String, dynamic> metadata = const {},
   }) {
     final event = ParkingEvent(
       id: 'EV-${DateTime.now().millisecondsSinceEpoch}',
@@ -1199,6 +1262,7 @@ class ParkingStateManager extends ChangeNotifier {
       type: type,
       timestamp: DateTime.now(),
       description: description,
+      metadata: metadata,
     );
     _events.insert(0, event);
     _persistBookings();

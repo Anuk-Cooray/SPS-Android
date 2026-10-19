@@ -66,12 +66,17 @@ export interface BookingDocument {
   completedAt?: string | null;
   holdExpiresAt: string;
   extensionsCount: number;
+  predictedEtaMinBaseline?: number;
+  predictedEtaMinProvider?: number;
+  predictedEtaMinCorrected?: number;
+  modelVersion?: string;
   slotSwapHistory?: Array<{
     previousSlotId: string;
     newSlotId: string;
     timestamp: string;
     distanceSavedMeters: number;
-    scoreImprovementPercent: number;
+    scoreImprovementPoints?: number;
+    scoreImprovementPercent?: number;
   }>;
 }
 
@@ -83,7 +88,8 @@ export type ParkingEventType =
   | 'hold_extended'
   | 'checked_in'
   | 'completed'
-  | 'auto_released';
+  | 'auto_released'
+  | 'trip_telemetry_logged';
 
 export interface ParkingEventDocument {
   id: string;
@@ -95,6 +101,28 @@ export interface ParkingEventDocument {
   timestamp: string;
   metadata?: Record<string, any>;
   description?: string;
+}
+
+export interface TripTelemetryDocument {
+  id: string;
+  tripId?: string;
+  bookingId: string;
+  userId: string;
+  lotId: string;
+  predictedEtaMinBaseline: number;
+  predictedEtaMinProvider: number;
+  predictedEtaMinCorrected: number;
+  actualTravelMin: number;
+  departureTime: string;
+  arrivalTime: string;
+  dayOfWeek: number;
+  hour: number;
+  distanceKm: number;
+  originZone: string;
+  weatherFlag: number;
+  holidayFlag: number;
+  modelVersion: string;
+  loggedAt: string;
 }
 
 export interface CreateBookingRequest {
@@ -110,6 +138,10 @@ export interface CreateBookingRequest {
     latitude: number;
     longitude: number;
   };
+  originZone?: string;
+  weatherFlag?: number;
+  holidayFlag?: number;
+  providerEtaMinutes?: number;
 }
 
 export interface CancelBookingRequest {
@@ -119,6 +151,7 @@ export interface CancelBookingRequest {
 export interface CheckInRequest {
   bookingId?: string;
   qrToken: string;
+  actualTravelMin?: number;
 }
 
 export interface ExtendHoldRequest {

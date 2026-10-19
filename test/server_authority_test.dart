@@ -4,9 +4,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_parking/core/theme/app_theme.dart';
 import 'package:smart_parking/data/models/booking_model.dart';
-import 'package:smart_parking/data/models/parking_lot_model.dart';
+import 'package:smart_parking/data/models/parking_event_model.dart';
 import 'package:smart_parking/data/models/parking_slot_model.dart';
-import 'package:smart_parking/data/models/vehicle_model.dart';
 import 'package:smart_parking/data/services/cloud_functions_client.dart';
 import 'package:smart_parking/data/services/mock_data.dart';
 import 'package:smart_parking/data/services/parking_state_manager.dart';
@@ -116,6 +115,54 @@ void main() {
 
       // Verify booking status remains reserved until server releases it
       expect(booking.status, BookingStatus.reserved);
+    });
+  });
+
+  group('Trip Telemetry & Learned ETA Model Integration', () {
+    test('reserveSlot computes and attaches baseline, provider, and corrected ETAs', () {
+      final manager = ParkingStateManager();
+      final lot = MockData.getInitialLots().first;
+      final slot = lot.slots.firstWhere((s) => s.isAvailable);
+
+      final arrival = DateTime.now().add(const Duration(minutes: 30));
+      final booking = manager.reserveSlot(
+        lot: lot,
+        slot: slot,
+        arrivalTime: arrival,
+        durationHours: 2,
+        originLat: 6.9271,
+        originLng: 79.8612,
+      );
+
+      expect(booking.predictedEtaMinBaseline > 0, isTrue);
+      expect(booking.predictedEtaMinProvider > 0, isTrue);
+      expect(booking.predictedEtaMinCorrected > 0, isTrue);
+      expect(booking.modelVersion, 'v1.0.0-linear');
+    });
+
+    test('checkIn logs checkedIn event with actualTravelMin and predictive telemetry metadata', () {
+      final manager = ParkingStateManager();
+      final lot = MockData.getInitialLots().first;
+      final slot = lot.slots.firstWhere((s) => s.isAvailable);
+
+      final arrival = DateTime.now().add(const Duration(minutes: 30));
+      manager.reserveSlot(
+        lot: lot,
+        slot: slot,
+        arrivalTime: arrival,
+        durationHours: 2,
+        originLat: 6.9271,
+        originLng: 79.8612,
+      );
+
+      manager.checkIn();
+
+      expect(manager.currentActiveBooking?.status, BookingStatus.checkedIn);
+      expect(manager.events, isNotEmpty);
+      final checkInEvent = manager.events.firstWhere((e) => e.type == ParkingEventType.checkedIn);
+      expect(checkInEvent.metadata.containsKey('actualTravelMin'), isTrue);
+      expect(checkInEvent.metadata['modelVersion'], 'v1.0.0-linear');
+      expect(checkInEvent.metadata.containsKey('predictedEtaMinCorrected'), isTrue);
     });
   });
 }

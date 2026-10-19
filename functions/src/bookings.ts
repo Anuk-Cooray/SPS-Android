@@ -98,6 +98,7 @@ export async function createBookingLogic(
     }
 
     // If driver origin provided, evaluate algorithmic travel feasibility
+    let feasibilityData = null;
     if (driverOrigin && lotData.latitude && lotData.longitude) {
       const feasibility = evaluateArrivalFeasibility({
         originLat: driverOrigin.latitude,
@@ -105,6 +106,10 @@ export async function createBookingLogic(
         destLat: lotData.latitude,
         destLng: lotData.longitude,
         requestedArrivalTime: arrivalDate,
+        originZone: request.originZone,
+        weatherFlag: request.weatherFlag,
+        holidayFlag: request.holidayFlag,
+        providerDurationMinutes: request.providerEtaMinutes,
       });
 
       if (!feasibility.isFeasible && arrivalDate.getTime() < feasibility.earliestFeasibleTime.getTime()) {
@@ -113,6 +118,7 @@ export async function createBookingLogic(
           `Travel feasibility check failed: You cannot arrive by requested time. Earliest feasible arrival is ${feasibility.recommendedArrivalTime.toISOString()}.`
         );
       }
+      feasibilityData = feasibility;
     }
 
     const newFreeSlots = Math.max(0, (lotData.freeSlots ?? 1) - 1);
@@ -142,6 +148,10 @@ export async function createBookingLogic(
       completedAt: null,
       holdExpiresAt: holdExpiresAt.toISOString(),
       extensionsCount: 0,
+      predictedEtaMinBaseline: feasibilityData?.predictedEtaMinBaseline ?? 15,
+      predictedEtaMinProvider: feasibilityData?.predictedEtaMinProvider ?? 12,
+      predictedEtaMinCorrected: feasibilityData?.predictedEtaMinCorrected ?? 14,
+      modelVersion: feasibilityData?.modelVersion ?? 'v1.0.0-linear',
       slotSwapHistory: [],
     };
 
@@ -160,6 +170,10 @@ export async function createBookingLogic(
         vehicleType,
         durationHours,
         estimatedFee,
+        predictedEtaMinBaseline: booking.predictedEtaMinBaseline,
+        predictedEtaMinProvider: booking.predictedEtaMinProvider,
+        predictedEtaMinCorrected: booking.predictedEtaMinCorrected,
+        modelVersion: booking.modelVersion,
       },
     };
 
@@ -328,6 +342,34 @@ export async function checkInLogic(
       description: `Barrier check-in confirmed for slot ${bookingData.slotId}.`,
     };
     transaction.set(eventRef, event);
+
+    // Record trip telemetry for learned ETA model logging
+    const bookedAtDate = new Date(bookingData.bookedAt);
+    const actualTravelMinutes = request.actualTravelMin ??
+      Math.max(3, Math.round((now.getTime() - bookedAtDate.getTime()) / (60 * 1000)));
+
+    const telemetryRef = db.collection('trip_telemetry').doc(`TRIP-${bookingData.id}`);
+    transaction.set(telemetryRef, {
+      id: telemetryRef.id,
+      tripId: `TRIP-${bookingData.id}`,
+      bookingId: bookingData.id,
+      userId: bookingData.userId,
+      lotId: bookingData.lotId,
+      predictedEtaMinBaseline: bookingData.predictedEtaMinBaseline ?? 15,
+      predictedEtaMinProvider: bookingData.predictedEtaMinProvider ?? 12,
+      predictedEtaMinCorrected: bookingData.predictedEtaMinCorrected ?? 14,
+      actualTravelMin: actualTravelMinutes,
+      departureTime: bookingData.bookedAt,
+      arrivalTime: now.toISOString(),
+      dayOfWeek: bookedAtDate.getDay() === 0 ? 7 : bookedAtDate.getDay(),
+      hour: bookedAtDate.getHours(),
+      distanceKm: 5.0,
+      originZone: 'Malabe_Kaduwela',
+      weatherFlag: 0,
+      holidayFlag: 0,
+      modelVersion: bookingData.modelVersion ?? 'v1.0.0-linear',
+      loggedAt: now.toISOString(),
+    });
 
     return { success: true, bookingId: bookingData.id, slotId: bookingData.slotId };
   });

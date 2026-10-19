@@ -10,6 +10,8 @@ import 'package:smart_parking/data/models/vehicle_model.dart';
 import 'package:smart_parking/data/services/arrival_feasibility_service.dart';
 import 'package:smart_parking/data/services/colombo_location_service.dart';
 import 'package:smart_parking/data/services/parking_state_manager.dart';
+import 'package:smart_parking/data/services/routing/eta_correction_model.dart';
+import 'package:smart_parking/data/services/routing/heuristic_route_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -89,6 +91,49 @@ void main() {
 
       expect(result.recommendedArrivalTime.minute % 5, equals(0));
       expect(result.recommendedArrivalTime.second, equals(0));
+    });
+
+    test('evaluateAsync queries RouteProvider and applies learned ETA correction', () async {
+      final now = DateTime.now();
+      final requestedTime = now.add(const Duration(hours: 2));
+
+      final result = await ArrivalFeasibilityService.evaluateAsync(
+        originLat: 6.9147,
+        originLng: 79.9729,
+        targetLot: mockLot,
+        requestedTime: requestedTime,
+        routeProvider: const HeuristicRouteProvider(),
+        originZone: 'Malabe_Kaduwela',
+      );
+
+      expect(result.isFeasible, isTrue);
+      expect(result.route, isNotNull);
+      expect(result.modelVersion, equals('v1.0.0-linear'));
+      expect(result.predictedEtaMinBaseline, greaterThan(0));
+      expect(result.predictedEtaMinProvider, greaterThan(0));
+      expect(result.predictedEtaMinCorrected, greaterThan(0));
+    });
+
+    test('EtaCorrectionModel scales up for peak hour and monsoon rain', () {
+      const model = EtaCorrectionModel();
+      final mondayPeak = DateTime(2026, 10, 20, 8, 30); // 8:30 AM Monday
+
+      final clearRatio = model.predictResidualRatio(
+        distanceKm: 12.0,
+        departureTime: mondayPeak,
+        originZone: 'Malabe_Kaduwela',
+        isRain: false,
+      );
+
+      final rainRatio = model.predictResidualRatio(
+        distanceKm: 12.0,
+        departureTime: mondayPeak,
+        originZone: 'Malabe_Kaduwela',
+        isRain: true,
+      );
+
+      expect(clearRatio, greaterThan(1.0)); // Peak hour delay
+      expect(rainRatio, greaterThan(clearRatio)); // Rain delay adds ~28%
     });
   });
 

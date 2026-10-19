@@ -7,6 +7,7 @@ import '../models/booking_model.dart';
 import '../models/parking_event_model.dart';
 import '../models/parking_lot_model.dart';
 import '../models/parking_slot_model.dart';
+import '../models/trip_telemetry_model.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import 'cloud_functions_client.dart';
@@ -71,6 +72,9 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>>? get _verificationsRef =>
       _isAvailable ? _firestore!.collection('email_verifications') : null;
 
+  CollectionReference<Map<String, dynamic>>? get _tripTelemetryRef =>
+      _isAvailable ? _firestore!.collection('trip_telemetry') : null;
+
   // --- Cloud Functions Callable Invocations (Server Reservation Authority) ---
 
   /// Invokes `createBooking` callable function to run an atomic server-side reservation transaction
@@ -86,6 +90,14 @@ class FirestoreService {
     String? vehicleType,
     double? originLat,
     double? originLng,
+    double? providerEtaMinutes,
+    String? originZone,
+    int? weatherFlag,
+    int? holidayFlag,
+    double? predictedEtaMinBaseline,
+    double? predictedEtaMinProvider,
+    double? predictedEtaMinCorrected,
+    String? modelVersion,
   }) async {
     try {
       final payload = <String, dynamic>{
@@ -103,6 +115,10 @@ class FirestoreService {
             'latitude': originLat,
             'longitude': originLng,
           },
+        'providerEtaMinutes': ?providerEtaMinutes,
+        'originZone': ?originZone,
+        'weatherFlag': ?weatherFlag,
+        'holidayFlag': ?holidayFlag,
       };
 
       final result = await _functions.call('createBooking', payload);
@@ -131,6 +147,10 @@ class FirestoreService {
         estimatedFee: 100 * durationHours,
         qrToken: 'QR-TOKEN-$slotId-${DateTime.now().millisecondsSinceEpoch}',
         holdExpiresAt: holdExpiresAt,
+        predictedEtaMinBaseline: predictedEtaMinBaseline ?? 0.0,
+        predictedEtaMinProvider: predictedEtaMinProvider ?? 0.0,
+        predictedEtaMinCorrected: predictedEtaMinCorrected ?? 0.0,
+        modelVersion: modelVersion ?? 'v1.0.0-linear',
       );
     }
   }
@@ -158,11 +178,13 @@ class FirestoreService {
   Future<bool> checkInOnServer({
     required String qrToken,
     String? bookingId,
+    int? actualTravelMin,
   }) async {
     try {
       final payload = <String, dynamic>{
         'qrToken': qrToken,
         'bookingId': ?bookingId,
+        'actualTravelMin': ?actualTravelMin,
       };
       await _functions.call('checkIn', payload);
       debugPrint('[FirestoreService] Server checkIn confirmed for QR: $qrToken');
@@ -171,6 +193,17 @@ class FirestoreService {
       debugPrint('[FirestoreService] Server checkIn call failed: $e');
       return false;
     }
+  }
+
+  /// Streams trip telemetry records for research audit and ML model evaluation
+  Stream<List<TripTelemetry>> streamTripTelemetry({String? userId, int limit = 100}) {
+    if (_tripTelemetryRef == null) return Stream.value([]);
+    var query = _tripTelemetryRef!.orderBy('loggedAt', descending: true).limit(limit);
+    if (userId != null) {
+      query = query.where('userId', isEqualTo: userId);
+    }
+    return query.snapshots().map((snap) =>
+        snap.docs.map((doc) => TripTelemetry.fromJson(doc.data())).toList());
   }
 
   /// Invokes `extendHold` callable function to add +15 min grace hold
