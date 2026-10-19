@@ -104,10 +104,12 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
             maxZoom: 18.0,
           ),
           children: [
-            // OSM / Carto Tile Layer
+            // CARTO Positron Grayscale Tile Layer (Design System Conforming)
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+              subdomains: const ['a', 'b', 'c', 'd'],
               userAgentPackageName: 'com.sliit.smartparking.smart_parking',
+              maxZoom: 19,
             ),
 
             // Route Polyline Layer
@@ -360,6 +362,27 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                 child: const Icon(Icons.remove_rounded, size: 20),
               ),
             ],
+          ),
+        ),
+
+        // 3. Map Tile Attribution (OpenStreetMap & CARTO License Compliance)
+        Positioned(
+          left: AppSpace.sm,
+          bottom: AppSpace.xs,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text(
+              '© OpenStreetMap contributors, © CARTO',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ),
       ],

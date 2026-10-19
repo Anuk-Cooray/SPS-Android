@@ -74,6 +74,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Helper: is the user an admin with custom claims
+    function isAdmin() {
+      return isAuthenticated() && (request.auth.token.admin == true || request.auth.token.role == 'admin');
+    }
+
+    // Scoring Weights & Engine Config: Read allowed for all authenticated users; writes strictly admin-only
+    match /config/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     // Idempotency Tracking: Server-only access
     match /processed_payments/{paymentRef} {
       allow read, write: if false;

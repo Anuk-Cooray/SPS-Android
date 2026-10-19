@@ -37,6 +37,20 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    flavorDimensions += "default"
+
+    productFlavors {
+        create("dev") {
+            dimension = "default"
+            applicationIdSuffix = ".dev"
+            resValue("string", "app_name", "SPS Dev")
+        }
+        create("prod") {
+            dimension = "default"
+            resValue("string", "app_name", "Smart Parking")
+        }
+    }
 }
 
 kotlin {

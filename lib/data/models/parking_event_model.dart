@@ -7,7 +7,8 @@ enum ParkingEventType {
   cancelled,
   autoCancelled,
   checkedIn,
-  completed;
+  completed,
+  weightsTuned;
 
   String get displayName => switch (this) {
         ParkingEventType.booked => 'Booked',
@@ -19,6 +20,7 @@ enum ParkingEventType {
         ParkingEventType.autoCancelled => 'Auto-cancelled (No-show)',
         ParkingEventType.checkedIn => 'Checked In at Barrier',
         ParkingEventType.completed => 'Completed & Paid',
+        ParkingEventType.weightsTuned => 'Weights Tuned (Audited)',
       };
 }
 

@@ -83,6 +83,7 @@ class Booking {
   final double predictedEtaMinProvider;
   final double predictedEtaMinCorrected;
   final String modelVersion;
+  final String weightsVersion;
 
   const Booking({
     required this.id,
@@ -112,6 +113,7 @@ class Booking {
     this.predictedEtaMinProvider = 0.0,
     this.predictedEtaMinCorrected = 0.0,
     this.modelVersion = 'v1.0.0-linear',
+    this.weightsVersion = 'v1.0.0',
   });
 
   DateTime get cancelDeadline => arrivalTime.add(const Duration(minutes: 15));
@@ -184,6 +186,7 @@ class Booking {
     double? predictedEtaMinProvider,
     double? predictedEtaMinCorrected,
     String? modelVersion,
+    String? weightsVersion,
   }) {
     return Booking(
       id: id ?? this.id,
@@ -218,6 +221,7 @@ class Booking {
       predictedEtaMinCorrected:
           predictedEtaMinCorrected ?? this.predictedEtaMinCorrected,
       modelVersion: modelVersion ?? this.modelVersion,
+      weightsVersion: weightsVersion ?? this.weightsVersion,
     );
   }
 
@@ -249,6 +253,7 @@ class Booking {
         'predictedEtaMinProvider': predictedEtaMinProvider,
         'predictedEtaMinCorrected': predictedEtaMinCorrected,
         'modelVersion': modelVersion,
+        'weightsVersion': weightsVersion,
       };
 
   static DateTime? _parseDate(dynamic val) {
@@ -312,6 +317,7 @@ class Booking {
       predictedEtaMinCorrected:
           (json['predictedEtaMinCorrected'] as num?)?.toDouble() ?? 0.0,
       modelVersion: json['modelVersion'] as String? ?? 'v1.0.0-linear',
+      weightsVersion: json['weightsVersion'] as String? ?? 'v1.0.0',
     );
   }
 }

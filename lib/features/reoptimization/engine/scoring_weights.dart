@@ -8,6 +8,7 @@ class ScoringWeights {
   final double minScoreImprovementPoints; // minimum score delta (e.g. 20.0 points)
   final int upgradeTriggerEtaMinutes; // trigger when ETA <= 10 min
   final int offerTimeoutSeconds; // hold window (default 60s)
+  final String version; // e.g. "v1.0.0"
 
   const ScoringWeights({
     this.distanceWeight = 0.40,
@@ -20,7 +21,15 @@ class ScoringWeights {
     double? minScoreImprovementPercent,
     this.upgradeTriggerEtaMinutes = 10,
     this.offerTimeoutSeconds = 60,
+    this.version = 'v1.0.0',
   }) : minScoreImprovementPoints = minScoreImprovementPoints ?? minScoreImprovementPercent ?? 20.0;
+
+  /// True if the 4 objective weights sum to 1.0 within ±0.001 tolerance
+  bool get isValidSum =>
+      ((distanceWeight + sizeFitWeight + preferenceWeight + demandWeight) - 1.0).abs() <= 0.001;
+
+  double get weightSum =>
+      distanceWeight + sizeFitWeight + preferenceWeight + demandWeight;
 
   @Deprecated('Use minScoreImprovementPoints instead')
   double get minScoreImprovementPercent => minScoreImprovementPoints;
@@ -36,6 +45,7 @@ class ScoringWeights {
     double? minScoreImprovementPercent,
     int? upgradeTriggerEtaMinutes,
     int? offerTimeoutSeconds,
+    String? version,
   }) {
     return ScoringWeights(
       distanceWeight: distanceWeight ?? this.distanceWeight,
@@ -49,6 +59,7 @@ class ScoringWeights {
       upgradeTriggerEtaMinutes:
           upgradeTriggerEtaMinutes ?? this.upgradeTriggerEtaMinutes,
       offerTimeoutSeconds: offerTimeoutSeconds ?? this.offerTimeoutSeconds,
+      version: version ?? this.version,
     );
   }
 
@@ -62,6 +73,7 @@ class ScoringWeights {
         'minScoreImprovementPercent': minScoreImprovementPoints,
         'upgradeTriggerEtaMinutes': upgradeTriggerEtaMinutes,
         'offerTimeoutSeconds': offerTimeoutSeconds,
+        'version': version,
       };
 
   factory ScoringWeights.fromJson(Map<String, dynamic> json) => ScoringWeights(
@@ -80,5 +92,6 @@ class ScoringWeights {
             (json['upgradeTriggerEtaMinutes'] as num?)?.toInt() ?? 10,
         offerTimeoutSeconds:
             (json['offerTimeoutSeconds'] as num?)?.toInt() ?? 60,
+        version: json['version'] as String? ?? 'v1.0.0',
       );
 }
