@@ -68,12 +68,36 @@ class Booking {
 
   DateTime get effectiveHoldDeadline => holdExpiresAt ?? cancelDeadline;
 
+  /// True if the driver is currently driving toward the parking lot before scheduled arrival
+  bool get isInTransit => DateTime.now().isBefore(arrivalTime);
+
+  /// Duration remaining until the driver is scheduled to arrive at the parking facility
+  Duration get timeUntilArrival {
+    final diff = arrivalTime.difference(DateTime.now());
+    return diff.isNegative ? Duration.zero : diff;
+  }
+
+  /// True if the scheduled arrival time has been reached and the 15m barrier hold is actively ticking
+  bool get isHoldWindowActive => !isInTransit && !isHoldExpired;
+
+  /// Remaining duration of the guaranteed 15m barrier hold window
   Duration get remainingHoldDuration {
+    // If in transit and no custom accelerated hold expiration is active, hold window has not started
+    if (isInTransit && holdExpiresAt == null) {
+      return const Duration(minutes: 15);
+    }
     final diff = effectiveHoldDeadline.difference(DateTime.now());
     return diff.isNegative ? Duration.zero : diff;
   }
 
-  bool get isHoldExpired => remainingHoldDuration == Duration.zero;
+  /// True if hold deadline has elapsed after scheduled arrival (triggering auto-release)
+  bool get isHoldExpired {
+    // In-transit bookings never expire before their arrival time unless explicitly fast-forwarded
+    if (isInTransit && holdExpiresAt == null) {
+      return false;
+    }
+    return DateTime.now().isAfter(effectiveHoldDeadline);
+  }
 
   bool get isActive =>
       status == BookingStatus.reserved ||

@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../../data/models/booking_model.dart';
@@ -119,13 +120,17 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
     double progress,
   ) {
     final state = context.watch<ParkingStateManager>();
+    final isInTransit = widget.booking.isInTransit && widget.booking.holdExpiresAt == null;
+    final arriveFormatted = DateFormat('h:mm a').format(widget.booking.arrivalTime);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.sm),
       decoration: BoxDecoration(
-        color: statusColor.withValues(alpha: 0.08),
+        color: (isInTransit ? const Color(0xFF10B981) : statusColor).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppRadius.input),
-        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: (isInTransit ? const Color(0xFF10B981) : statusColor).withValues(alpha: 0.3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,21 +138,52 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
           Row(
             children: [
               Icon(
-                isExpired ? Icons.cancel_outlined : Icons.timer_outlined,
+                isInTransit
+                    ? Icons.directions_car_rounded
+                    : (isExpired ? Icons.cancel_outlined : Icons.timer_outlined),
                 size: 16,
-                color: statusColor,
+                color: isInTransit ? const Color(0xFF10B981) : statusColor,
               ),
               const SizedBox(width: AppSpace.xs),
               Expanded(
                 child: Text(
-                  isExpired ? 'Hold expired · Auto-released' : 'Hold expires in ${_formatDuration(_remaining)}',
+                  isInTransit
+                      ? 'In transit · Arriving at $arriveFormatted'
+                      : (isExpired ? 'Hold expired · Auto-released' : 'Hold expires in ${_formatDuration(_remaining)}'),
                   style: AppText.caption.copyWith(
-                    color: statusColor,
+                    color: isInTransit ? const Color(0xFF10B981) : statusColor,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              if (!isExpired)
+              if (isInTransit)
+                InkWell(
+                  onTap: () => state.fastForwardToArrivalTime(),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: c.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.fast_forward_rounded, size: 12, color: c.accent),
+                        const SizedBox(width: 2),
+                        Text(
+                          'To Arrival',
+                          style: AppText.overline.copyWith(
+                            color: c.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (!isExpired)
                 InkWell(
                   onTap: () => state.fastForwardHoldTimer(remaining: const Duration(seconds: 10)),
                   borderRadius: BorderRadius.circular(4),
@@ -176,7 +212,7 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
                 ),
             ],
           ),
-          if (!isExpired) ...[
+          if (!isInTransit && !isExpired) ...[
             const SizedBox(height: 6),
             ClipRRect(
               borderRadius: BorderRadius.circular(2),
@@ -203,16 +239,19 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
     final state = context.watch<ParkingStateManager>();
     final minutes = _remaining.inMinutes;
     final seconds = _remaining.inSeconds % 60;
+    final isInTransit = widget.booking.isInTransit && widget.booking.holdExpiresAt == null;
+    final arriveFormatted = DateFormat('h:mm a').format(widget.booking.arrivalTime);
+    final activeStatusColor = isInTransit ? const Color(0xFF10B981) : statusColor;
 
     return Container(
       padding: const EdgeInsets.all(AppSpace.lg),
       decoration: BoxDecoration(
         color: c.surface,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: statusColor.withValues(alpha: 0.35)),
+        border: Border.all(color: activeStatusColor.withValues(alpha: 0.35)),
         boxShadow: [
           BoxShadow(
-            color: statusColor.withValues(alpha: 0.05),
+            color: activeStatusColor.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -231,13 +270,13 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: statusColor,
+                      color: activeStatusColor,
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: AppSpace.xs),
                   Text(
-                    'HOLD RESERVATION TIMER',
+                    isInTransit ? 'TRIP IN PROGRESS' : 'HOLD RESERVATION TIMER',
                     style: AppText.overline.copyWith(
                       color: c.textSecondary,
                       letterSpacing: 1.1,
@@ -249,17 +288,19 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
+                  color: activeStatusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  isExpired
-                      ? 'EXPIRED'
-                      : _remaining.inMinutes < 5
-                          ? 'EXPIRING SOON'
-                          : 'HOLD ACTIVE',
+                  isInTransit
+                      ? 'IN TRANSIT'
+                      : isExpired
+                          ? 'EXPIRED'
+                          : _remaining.inMinutes < 5
+                              ? 'EXPIRING SOON'
+                              : 'HOLD ACTIVE',
                   style: AppText.overline.copyWith(
-                    color: statusColor,
+                    color: activeStatusColor,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -275,9 +316,11 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                isInTransit
+                    ? '${widget.booking.timeUntilArrival.inMinutes}m'
+                    : '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
                 style: AppText.h1.copyWith(
-                  color: statusColor,
+                  color: activeStatusColor,
                   fontSize: 38,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -1,
@@ -286,7 +329,9 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
               ),
               const SizedBox(width: AppSpace.sm),
               Text(
-                isExpired ? 'auto-released' : 'remaining hold',
+                isInTransit
+                    ? 'until arrival ($arriveFormatted)'
+                    : (isExpired ? 'auto-released' : 'remaining hold'),
                 style: AppText.caption.copyWith(
                   color: c.textSecondary,
                   fontWeight: FontWeight.w600,
@@ -297,9 +342,11 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
 
           const SizedBox(height: 6),
           Text(
-            isExpired
-                ? 'Your 15-minute barrier hold expired. Slot ${widget.booking.slotId} has been returned to the campus availability pool.'
-                : 'Your barrier gate pass is guaranteed. Arrive and scan before expiry to lock in your slot.',
+            isInTransit
+                ? 'Driving to ${widget.booking.lotName}. Your 15-minute guaranteed barrier hold countdown will activate upon scheduled arrival at $arriveFormatted.'
+                : isExpired
+                    ? 'Your 15-minute barrier hold expired. Slot ${widget.booking.slotId} has been returned to the campus availability pool.'
+                    : 'Your barrier gate pass is guaranteed. Arrive and scan before expiry to lock in your slot.',
             style: AppText.caption.copyWith(
               color: c.textSecondary,
               height: 1.35,
@@ -312,14 +359,41 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: progress,
+              value: isInTransit ? 0.35 : progress,
               backgroundColor: c.border,
-              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+              valueColor: AlwaysStoppedAnimation<Color>(activeStatusColor),
               minHeight: 5,
             ),
           ),
 
-          if (!isExpired) ...[
+          if (isInTransit) ...[
+            const SizedBox(height: AppSpace.md),
+            const Divider(),
+            const SizedBox(height: AppSpace.xs),
+
+            // In-Transit Fast Forward Controls
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: c.textPrimary,
+                  side: BorderSide(color: c.border),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.input),
+                  ),
+                ),
+                icon: Icon(Icons.fast_forward_rounded, size: 16, color: c.accent),
+                label: Text(
+                  'Fast-Forward to Arrival Time ($arriveFormatted)',
+                  style: AppText.caption.copyWith(fontWeight: FontWeight.w700),
+                ),
+                onPressed: () {
+                  state.fastForwardToArrivalTime();
+                },
+              ),
+            ),
+          ] else if (!isExpired) ...[
             const SizedBox(height: AppSpace.md),
             const Divider(),
             const SizedBox(height: AppSpace.xs),

@@ -5,8 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_parking/core/theme/app_theme.dart';
 import 'package:smart_parking/data/models/booking_model.dart';
 import 'package:smart_parking/data/models/parking_event_model.dart';
-import 'package:smart_parking/data/models/parking_lot_model.dart';
-import 'package:smart_parking/data/models/parking_slot_model.dart';
 import 'package:smart_parking/data/services/parking_state_manager.dart';
 
 void main() {

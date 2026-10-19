@@ -7,16 +7,23 @@ import '../../data/models/booking_model.dart';
 import '../../data/models/parking_lot_model.dart';
 import '../../data/models/parking_slot_model.dart';
 import '../../data/models/vehicle_model.dart';
+import '../../data/services/arrival_feasibility_service.dart';
 import '../../data/services/parking_state_manager.dart';
 import 'engine/slot_score_result.dart';
+import 'widgets/arrival_adjustment_modal.dart';
+import 'widgets/booking_confirmed_dialog.dart';
 
 class BookSlotScreen extends StatefulWidget {
   final ParkingLot lot;
+  final double? originLat;
+  final double? originLng;
   final ValueChanged<Booking> onBookingConfirmed;
 
   const BookSlotScreen({
     super.key,
     required this.lot,
+    this.originLat,
+    this.originLng,
     required this.onBookingConfirmed,
   });
 
@@ -283,6 +290,41 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
       );
       return;
     }
+
+    // Predictive driving distance & traffic feasibility validation
+    final originLat = widget.originLat ?? 6.9147;
+    final originLng = widget.originLng ?? 79.9729;
+
+    final feasibility = ArrivalFeasibilityService.evaluate(
+      originLat: originLat,
+      originLng: originLng,
+      targetLot: widget.lot,
+      requestedTime: _arrivalTime,
+    );
+
+    if (!feasibility.isFeasible) {
+      // Display algorithmic arrival adjustment modal
+      ArrivalAdjustmentModal.show(
+        context,
+        result: feasibility,
+        lotName: widget.lot.name,
+        onAccept: () {
+          setState(() {
+            _arrivalTime = feasibility.recommendedArrivalTime;
+          });
+          _finalizeBooking();
+        },
+        onPickOtherTime: () {
+          _selectTime();
+        },
+      );
+      return;
+    }
+
+    _finalizeBooking();
+  }
+
+  void _finalizeBooking() {
     final state = context.read<ParkingStateManager>();
     final booking = state.reserveSlot(
       lot: widget.lot,
@@ -291,7 +333,21 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
       durationHours: _durationHours,
     );
 
-    widget.onBookingConfirmed(booking);
+    // Present post-booking dialog with navigation choices
+    BookingConfirmedDialog.show(
+      context,
+      booking: booking,
+      lot: widget.lot,
+      originLat: widget.originLat,
+      originLng: widget.originLng,
+      onStartInAppNav: () {
+        widget.onBookingConfirmed(booking);
+      },
+      onReturnHome: () {
+        // Pop BookSlotScreen back to main screen - booking continues in background
+        Navigator.of(context).pop();
+      },
+    );
   }
 
   @override

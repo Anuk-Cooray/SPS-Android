@@ -964,6 +964,29 @@ class ParkingStateManager extends ChangeNotifier {
     }
   }
 
+  /// Fast-forwards the simulation to the scheduled arrival time so examiners can observe
+  /// the 15-minute barrier arrival countdown start immediately.
+  void fastForwardToArrivalTime() {
+    if (_currentActiveBooking == null) return;
+    final now = DateTime.now();
+    final updated = _currentActiveBooking!.copyWith(
+      arrivalTime: now,
+      holdExpiresAt: now.add(const Duration(minutes: 15)),
+    );
+    final idx = _bookings.indexWhere((b) => b.id == updated.id);
+    if (idx != -1) {
+      _bookings[idx] = updated;
+    }
+    _currentActiveBooking = updated;
+    _firestore.saveBooking(updated);
+    _logEvent(
+      bookingId: updated.id,
+      type: ParkingEventType.booked,
+      description: 'Trip fast-forwarded to arrival time (15m barrier hold activated)',
+    );
+    notifyListeners();
+  }
+
   /// Fast-forwards the hold deadline to remaining duration (default 10s) for live evaluation testing
   void fastForwardHoldTimer({Duration remaining = const Duration(seconds: 10)}) {
     if (_currentActiveBooking == null) return;

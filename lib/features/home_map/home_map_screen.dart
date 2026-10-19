@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/google_maps_launcher.dart';
 import '../../data/models/colombo_landmark_model.dart';
 import '../../data/models/parking_lot_model.dart';
 import '../../data/services/colombo_location_service.dart';
@@ -62,49 +61,9 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     });
   }
 
-  ParkingLot? get _selectedLot {
-    if (_activeLots.isEmpty) return null;
-    return _activeLots.firstWhere(
-      (l) => l.id == _selectedLotId,
-      orElse: () => _activeLots.first,
-    );
-  }
-
-  void _launchGoogleMapsNavigation() async {
-    final lot = _selectedLot;
-    if (lot == null) return;
-
-    final success = await GoogleMapsLauncher.launchNavigation(
-      destinationLat: lot.latitude,
-      destinationLng: lot.longitude,
-      originLat: _pickup.latitude,
-      originLng: _pickup.longitude,
-      destinationLabel: '${lot.name} (${_destination.name})',
-    );
-
-    if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Could not launch external Google Maps app. Opening browser directions...',
-            style: AppText.caption.copyWith(color: Colors.white),
-          ),
-          backgroundColor: Colors.black87,
-        ),
-      );
-    }
-  }
-
-  void _launchInAppSmartNavigation() {
-    final lot = _selectedLot;
-    if (lot == null) return;
-    widget.onSelectLot(lot);
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final lot = _selectedLot;
 
     return Scaffold(
       backgroundColor: c.background,
@@ -243,98 +202,6 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                           ),
                         ),
                       ],
-                    ),
-
-                    const SizedBox(height: AppSpace.md),
-
-                    // Dual Navigation Quick Action Bar
-                    Container(
-                      padding: const EdgeInsets.all(AppSpace.sm),
-                      decoration: BoxDecoration(
-                        color: c.surfaceMuted,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: c.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.directions_car_rounded, size: 16, color: c.accent),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  lot != null
-                                      ? 'Navigate to ${lot.name}'
-                                      : 'Select parking lot to navigate',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppText.caption.copyWith(
-                                    color: c.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              // In-App Smart Re-Optimization Navigation
-                              Expanded(
-                                flex: 6,
-                                child: ElevatedButton.icon(
-                                  onPressed: lot != null ? _launchInAppSmartNavigation : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: c.accent,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.navigation_rounded, size: 16),
-                                  label: const Text(
-                                    'In-App Nav',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(width: 8),
-
-                              // Launch External Google Maps App
-                              Expanded(
-                                flex: 5,
-                                child: OutlinedButton.icon(
-                                  onPressed: lot != null ? _launchGoogleMapsNavigation : null,
-                                  style: OutlinedButton.styleFrom(
-                                    backgroundColor: c.surface,
-                                    foregroundColor: c.textPrimary,
-                                    side: BorderSide(color: c.border),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.map_rounded, size: 16),
-                                  label: const Text(
-                                    'Google Maps',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
                     ),
 
                     const SizedBox(height: AppSpace.md),

@@ -5,9 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../models/booking_model.dart';
 import '../models/parking_event_model.dart';
 import '../models/parking_lot_model.dart';
-import '../models/parking_slot_model.dart';
 import '../models/user_model.dart';
-import '../models/vehicle_model.dart';
 
 class OtpVerificationResult {
   final bool isValid;

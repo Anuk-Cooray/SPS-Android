@@ -2,7 +2,6 @@
 // Unit tests for Colombo Landmarks, Uber-Style Navigation, and Google Maps Launching
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:smart_parking/data/models/colombo_landmark_model.dart';
 import 'package:smart_parking/data/services/colombo_location_service.dart';
 
 void main() {

@@ -39,28 +39,11 @@ class ColomboLandmark {
 
   /// Approximate driving distance from given origin coordinates in kilometers
   double distanceToKm(double fromLat, double fromLng) {
-    // Haversine formula approximation
-    const p = 0.017453292519943295; // Math.PI / 180
-    final a = 0.5 -
-        ((latitude - fromLat) * p / 2).abs() * ((latitude - fromLat) * p / 2).abs() +
-        (latitude * p) *
-            (fromLat * p) *
-            (1 - ((longitude - fromLng) * p / 2).abs()) /
-            2;
-    // Flat-earth / Euclidean distance projection suitable for Colombo metropolitan area
-    final dLat = (latitude - fromLat) * 111.0;
-    final dLng = (longitude - fromLng) * 111.0 * 0.99; // cos(6.9 deg) ~ 0.992
-    final straightLineKm = (dLat * dLat + dLng * dLng);
-    if (straightLineKm <= 0) return 0.1;
-    final direct = (straightLineKm > 0) ? (straightLineKm > 0 ? (straightLineKm * 1.0) : 0.1) : 0.1;
-    // Street curvature factor in Colombo ~ 1.35
-    final streetFactor = 1.35;
-    final estimatedKm = direct > 0 ? (straightLineKm > 0 ? (straightLineKm) : 0.1) : 0.1;
-    // Safe standard formula
+    // Colombo arterial street curvature factor ~ 1.35
+    const streetFactor = 1.35;
     final dX = (longitude - fromLng) * 110.574 * 0.9927;
     final dY = (latitude - fromLat) * 110.574;
     final distKm = (dX * dX + dY * dY);
-    // Square root
     final r = distKm > 0 ? _sqrt(distKm) * streetFactor : 0.2;
     return double.parse(r.toStringAsFixed(1));
   }

@@ -27,13 +27,32 @@ class ParkedScreen extends StatelessWidget {
             children: [
               const SizedBox(height: AppSpace.sm),
 
-              // Top Title & Session Active badge
+              // Top Title & Session Active badge with Return Button
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Parked',
-                    style: AppText.h1.copyWith(color: c.textPrimary),
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: c.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: c.border),
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.arrow_back_rounded, color: c.textPrimary, size: 22),
+                          tooltip: 'Return to Main Screen',
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.md),
+                      Text(
+                        'Parked',
+                        style: AppText.h1.copyWith(color: c.textPrimary),
+                      ),
+                    ],
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

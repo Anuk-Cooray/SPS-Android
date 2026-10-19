@@ -70,60 +70,91 @@ class _NavigationScreenState extends State<NavigationScreen> {
             ),
           ),
 
-          // 2. Top Turn-by-Turn Dynamic Guidance Banner
+          // 2. Top Turn-by-Turn Dynamic Guidance Banner with Return Button
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpace.lg,
                 vertical: AppSpace.sm,
               ),
-              child: Container(
-                padding: const EdgeInsets.all(AppSpace.md),
-                decoration: BoxDecoration(
-                  color: state.hasArrivedAtDestination ? c.accent : c.primary,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    )
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      state.currentManeuverIcon,
-                      color: c.onPrimary,
-                      size: 34,
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    margin: const EdgeInsets.only(right: AppSpace.sm),
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.cardSm),
+                      border: Border.all(color: c.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: AppSpace.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+                    child: IconButton(
+                      icon: Icon(Icons.arrow_back_rounded, color: c.textPrimary, size: 22),
+                      tooltip: 'Return to Main Screen',
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpace.md),
+                      decoration: BoxDecoration(
+                        color: state.hasArrivedAtDestination ? c.accent : c.primary,
+                        borderRadius: BorderRadius.circular(AppRadius.card),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          )
+                        ],
+                      ),
+                      child: Row(
                         children: [
-                          Text(
-                            state.currentManeuverDistance,
-                            style: AppText.h2.copyWith(
-                              color: c.onPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          Icon(
+                            state.currentManeuverIcon,
+                            color: c.onPrimary,
+                            size: 30,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            state.currentManeuverText,
-                            style: AppText.body.copyWith(
-                              color: c.onPrimary.withValues(alpha: 0.88),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                          const SizedBox(width: AppSpace.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  state.currentManeuverDistance,
+                                  style: AppText.h2.copyWith(
+                                    color: c.onPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  state.currentManeuverText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.body.copyWith(
+                                    color: c.onPrimary.withValues(alpha: 0.88),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
