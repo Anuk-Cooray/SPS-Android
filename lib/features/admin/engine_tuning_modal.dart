@@ -45,6 +45,22 @@ class _EngineTuningModalState extends State<EngineTuningModal> {
     _triggerEtaMinutes = weights.upgradeTriggerEtaMinutes.toDouble();
   }
 
+  double get _currentSum =>
+      _distWeight + _sizeWeight + _prefWeight + _demandWeight;
+
+  bool get _isValidSum => (_currentSum - 1.0).abs() <= 0.001;
+
+  void _normalizeWeights() {
+    final sum = _currentSum;
+    if (sum <= 0.0) return;
+    setState(() {
+      _distWeight = double.parse((_distWeight / sum).toStringAsFixed(2));
+      _sizeWeight = double.parse((_sizeWeight / sum).toStringAsFixed(2));
+      _prefWeight = double.parse((_prefWeight / sum).toStringAsFixed(2));
+      _demandWeight = double.parse((1.0 - (_distWeight + _sizeWeight + _prefWeight)).toStringAsFixed(2));
+    });
+  }
+
   void _resetToDefaults() {
     const d = ScoringWeights();
     setState(() {
@@ -274,11 +290,74 @@ class _EngineTuningModalState extends State<EngineTuningModal> {
                 c: c,
               ),
 
+              // Live Weight Sum & Validation Card (SYS-01 Rigor)
+              Container(
+                margin: const EdgeInsets.only(top: AppSpace.sm),
+                padding: const EdgeInsets.all(AppSpace.md),
+                decoration: BoxDecoration(
+                  color: _isValidSum ? c.accentSoft.withValues(alpha: 0.3) : c.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.cardSm),
+                  border: Border.all(
+                    color: _isValidSum ? c.accent : c.danger,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isValidSum ? Icons.check_circle_rounded : Icons.warning_rounded,
+                      color: _isValidSum ? c.accent : c.danger,
+                      size: 20,
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Weight Sum: ${(_currentSum * 100).toStringAsFixed(1)}% (Target: 100.0%)',
+                            style: AppText.caption.copyWith(
+                              color: _isValidSum ? c.accent : c.danger,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            _isValidSum
+                                ? 'Normalized valid distribution (Σw = 1.0 ± 0.001)'
+                                : 'Weights must sum to 1.0 (±0.001) to apply changes.',
+                            style: AppText.caption.copyWith(
+                              color: c.textSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!_isValidSum)
+                      TextButton(
+                        onPressed: _normalizeWeights,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Normalize',
+                          style: AppText.caption.copyWith(
+                            color: c.accent,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: AppSpace.xl),
 
               PrimaryButton(
-                text: 'Apply Hyperparameters',
-                onPressed: _applyWeights,
+                text: _isValidSum ? 'Apply Hyperparameters' : 'Sum Must Equal 1.0',
+                onPressed: _isValidSum ? _applyWeights : null,
               ),
               const SizedBox(height: AppSpace.sm),
             ],

@@ -57,3 +57,12 @@ app.*.map.json
 Resources.zip
 Resources/Docs/*.pdf
 Resources/Docs/*.7z
+
+# Keystores, signing keys, and environment secrets
+key.properties
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
+

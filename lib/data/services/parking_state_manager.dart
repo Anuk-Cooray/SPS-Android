@@ -230,9 +230,31 @@ class ParkingStateManager extends ChangeNotifier {
   ReoptimizationEngine get engine => _engine;
   ScoringWeights get scoringWeights => _engine.weights;
   UpgradeEvaluationResult? get lastUpgradeEvaluation => _lastUpgradeEvaluation;
+  int _weightsVersionCounter = 1;
+  String get weightsVersion => _engine.weights.version;
 
   void updateScoringWeights(ScoringWeights newWeights) {
-    _engine.weights = newWeights;
+    if (!newWeights.isValidSum) {
+      throw ArgumentError(
+        'Weights must sum to 1.0 (±0.001). Current sum: ${newWeights.weightSum.toStringAsFixed(3)}',
+      );
+    }
+    _weightsVersionCounter++;
+    final versioned = newWeights.copyWith(version: 'v1.$_weightsVersionCounter.0');
+    _engine.weights = versioned;
+
+    // Log audited telemetry event
+    final auditEvent = ParkingEvent(
+      id: 'weight-audit-${DateTime.now().millisecondsSinceEpoch}',
+      bookingId: '',
+      type: ParkingEventType.weightsTuned,
+      timestamp: DateTime.now(),
+      description:
+          'Weights tuned (${versioned.version}): dist=${(versioned.distanceWeight * 100).toInt()}%, size=${(versioned.sizeFitWeight * 100).toInt()}%, pref=${(versioned.preferenceWeight * 100).toInt()}%, dem=${(versioned.demandWeight * 100).toInt()}%',
+      metadata: versioned.toJson(),
+    );
+    _events.insert(0, auditEvent);
+
     notifyListeners();
   }
 
@@ -582,6 +604,7 @@ class ParkingStateManager extends ChangeNotifier {
       predictedEtaMinProvider: feasibility?.predictedEtaMinProvider ?? 0.0,
       predictedEtaMinCorrected: feasibility?.predictedEtaMinCorrected ?? 0.0,
       modelVersion: feasibility?.modelVersion ?? 'v1.0.0-linear',
+      weightsVersion: _engine.weights.version,
     );
 
     _applyLocalBooking(newBooking, lot, slot);
