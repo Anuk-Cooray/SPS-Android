@@ -1,3 +1,4 @@
+import '../../models/billing/exit_token.dart';
 import '../../models/billing/demand_forecast_point.dart';
 import '../../models/billing/fee_quote.dart';
 import '../../models/billing/invoice.dart';
@@ -10,6 +11,7 @@ class MockBillingService implements BillingService {
   static const _rates = {'lot-main': 100, 'lot-new-p2': 80, 'lot-sports': 50};
   final Map<String, Invoice> _invoices = {};
   int _sequence = 0;
+  final Map<String, ExitToken> _exitTokens = {};
 
   int _rate(String lotId) =>
       _rates[lotId] ??
@@ -102,6 +104,27 @@ class MockBillingService implements BillingService {
       message: method == 'guard'
           ? 'Awaiting guard confirmation; no funds charged.'
           : 'Offline simulation only; no funds charged.',
+    );
+  }
+
+  @override
+  Future<Invoice> confirmMockPayment(PaymentSession session) async {
+    if (!session.isMock) throw StateError('Expected mock session');
+    return getInvoice(session.invoiceId);
+  }
+
+  @override
+  Future<ExitToken> getExitToken(String invoiceId) async {
+    final invoice = await getInvoice(invoiceId);
+    if (!invoice.isPaid) throw StateError('Settle the invoice first');
+    final now = DateTime.now().toUtc();
+    final existing = _exitTokens[invoiceId];
+    if (existing != null && existing.isValidAt(now)) return existing;
+    return _exitTokens[invoiceId] = ExitToken(
+      invoiceId: invoiceId,
+      token: 'offline-demo:$invoiceId:${++_sequence}',
+      expiresAt: now.add(const Duration(minutes: 5)),
+      isMock: true,
     );
   }
 

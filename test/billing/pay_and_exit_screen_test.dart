@@ -54,6 +54,27 @@ class PendingService extends MockBillingService {
   }
 }
 
+class BackendMockService extends PendingService {
+  @override
+  Future<PaymentSession> startPayment({
+    required String invoiceId,
+    required String method,
+  }) async => PaymentSession(
+    id: 'pending-mock',
+    invoiceId: invoiceId,
+    method: method,
+    provider: 'mock',
+    status: 'pending',
+    isMock: true,
+    mockWebhookToken: 'test-token',
+  );
+  @override
+  Future<Invoice> confirmMockPayment(PaymentSession session) async {
+    confirmed = true;
+    return getInvoice(session.invoiceId);
+  }
+}
+
 void main() {
   setUp(() => GoogleFonts.config.allowRuntimeFetching = false);
 
@@ -108,6 +129,10 @@ void main() {
       expect(find.text('Visa •••• 4821 · Sandbox'), findsOneWidget);
       await tester.tap(find.text('Pay LKR ${state.quote!.total}'));
       await tester.pumpAndSettle();
+      expect(results, isEmpty);
+      expect(state.exitToken, isNotNull);
+      await tester.tap(find.text('Finish demo exit'));
+      await tester.pumpAndSettle();
       expect(results, [state.invoice!.quote.total]);
       await tester.pump();
       expect(results, hasLength(1));
@@ -159,7 +184,35 @@ void main() {
       service.confirmed = true;
       await tester.tap(find.text('Check status'));
       await tester.pumpAndSettle();
+      expect(results, isEmpty);
+      expect(state.exitToken, isNotNull);
+      await tester.tap(find.text('Finish demo exit'));
+      await tester.pumpAndSettle();
       expect(results, [state.invoice!.quote.total]);
+    },
+  );
+
+  testWidgets(
+    'backend mock requires explicit confirmation then shows paid pass',
+    (tester) async {
+      final service = BackendMockService();
+      final state = BillingStateManager(service: service);
+      addTearDown(state.dispose);
+      final results = <int>[];
+      await show(tester, state, booking(), results.add);
+      await tester.tap(find.text('Pay LKR ${state.quote!.total}'));
+      await tester.pumpAndSettle();
+      expect(service.confirmed, isFalse);
+      expect(state.exitToken, isNull);
+      await tester.tap(find.text('Confirm mock'));
+      await tester.pumpAndSettle();
+      expect(service.confirmed, isTrue);
+      expect(state.isPaid, isTrue);
+      expect(state.exitToken, isNotNull);
+      expect(results, isEmpty);
+      await tester.tap(find.text('Finish demo exit'));
+      await tester.pumpAndSettle();
+      expect(results, hasLength(1));
     },
   );
 

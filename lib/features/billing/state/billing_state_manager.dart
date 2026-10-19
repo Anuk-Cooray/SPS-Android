@@ -1,3 +1,5 @@
+import '../../../data/models/billing/exit_token.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../data/models/booking_model.dart';
@@ -11,6 +13,8 @@ import '../../../data/services/billing/http_billing_service.dart';
 /// Billing owns quotes/settlement; the caller alone finalizes a parking booking.
 class BillingStateManager extends ChangeNotifier {
   final BillingService service;
+  ExitToken? _exitToken;
+  ExitToken? get exitToken => _exitToken;
   FeeQuote? _quote;
   Invoice? _invoice;
   PaymentSession? _session;
@@ -38,6 +42,7 @@ class BillingStateManager extends ChangeNotifier {
     if (_isBusy || _disposed) return;
     final entry = booking.checkedInAt;
     if (entry == null) {
+      _exitToken = null;
       _quote = null;
       _invoice = null;
       _session = null;
@@ -77,6 +82,7 @@ class BillingStateManager extends ChangeNotifier {
     String? upgradeToSlotId,
   }) async {
     if (_isBusy || _disposed) return;
+    _exitToken = null;
     _quote = null;
     _invoice = null;
     _session = null;
@@ -136,6 +142,7 @@ class BillingStateManager extends ChangeNotifier {
       );
       // A checkout session (including a backend mock session) is not proof of payment.
       _invoice = await service.getInvoice(_invoice!.id);
+      if (isPaid) _exitToken = await service.getExitToken(_invoice!.id);
     });
   }
 
@@ -146,6 +153,17 @@ class BillingStateManager extends ChangeNotifier {
       if (current == null) throw StateError('Create an invoice first');
       _invoice = await service.getInvoice(current.id);
       _quote = _invoice!.quote;
+      if (isPaid) _exitToken = await service.getExitToken(_invoice!.id);
+    });
+  }
+
+  Future<void> confirmMockPayment() async {
+    if (_isBusy || _disposed) return;
+    await _run(() async {
+      final current = _session;
+      if (current == null) throw StateError('Start a mock payment first');
+      _invoice = await service.confirmMockPayment(current);
+      if (isPaid) _exitToken = await service.getExitToken(_invoice!.id);
     });
   }
 

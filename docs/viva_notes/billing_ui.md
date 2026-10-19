@@ -9,9 +9,9 @@ InvoiceBreakdownCard shows every ordered quote line and its total with wrapping 
 Booth payment remains awaiting_guard and shows an invoice-reference QR, explicitly not an exit QR. It carries an invoice ID, not a paid barrier authorization. The authenticated guard-generated workflow still belongs to later admin integration. A checkout return/session alone never calls onPaymentCompleted. The screen checks its paid invoice and prevents duplicate callbacks. Footer text does not promise real barrier hardware operation.
 
 ## Limitations
-No real saved card, hosted checkout/Stripe client or barrier/exit-token integration. The default mock simulates payment; HTTP sessions can remain pending until externally confirmed. Synthetic uncertainty is illustrative. Screen tests cover arrival/upgrade rows, guard waiting, pending-to-paid refresh and dark chart layout; narrow-view tests caught and shortened the button labels to fit.
+No real saved card, hosted checkout/Stripe client or hardware barrier integration. Paid-only backend exit passes are shown as QR codes; offline passes are labelled unable to open a gate. The default mock simulates payment; Backend mock sessions have an explicit Confirm mock action; configured provider sessions still require verified callbacks. Synthetic uncertainty is illustrative. Screen tests cover arrival/upgrade rows, guard waiting, pending-to-paid refresh and dark chart layout; narrow-view tests caught and shortened the button labels to fit.
 
 ## Three viva questions
 - **Why scroll the body?** Real quote lines and the chart may exceed the reference design's fixed height.
 - **Why label the booth QR?** Invoice identification is not single-use exit authorization.
-- **When does navigation complete?** Exactly once after the current booking's invoice reports paid.
+- **When does navigation complete?** Exactly once on Finish demo exit, after paid status and an unexpired pass are checked.

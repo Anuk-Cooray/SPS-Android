@@ -1,4 +1,7 @@
 class PaymentSession {
+  final int amountMinor;
+  final String currency;
+  final String? mockWebhookToken;
   final String id;
   final String invoiceId;
   final String method;
@@ -9,6 +12,9 @@ class PaymentSession {
   final String message;
 
   const PaymentSession({
+    this.amountMinor = 0,
+    this.currency = 'LKR',
+    this.mockWebhookToken,
     required this.id,
     required this.invoiceId,
     required this.method,
@@ -20,6 +26,9 @@ class PaymentSession {
   });
 
   factory PaymentSession.fromJson(Map<String, dynamic> json) => PaymentSession(
+    amountMinor: json['amount_minor'] as int? ?? 0,
+    currency: json['currency'] as String? ?? 'LKR',
+    mockWebhookToken: json['mock_webhook_token'] as String?,
     id: json['id'] as String,
     invoiceId: json['invoice_id'] as String,
     method: json['method'] as String,
@@ -31,6 +40,9 @@ class PaymentSession {
   );
 
   Map<String, dynamic> toJson() => {
+    'amount_minor': amountMinor,
+    'currency': currency,
+    'mock_webhook_token': mockWebhookToken,
     'id': id,
     'invoice_id': invoiceId,
     'method': method,

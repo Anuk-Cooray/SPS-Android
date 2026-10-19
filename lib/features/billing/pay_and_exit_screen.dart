@@ -43,7 +43,6 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
   Future<void> _load() async {
     final state = context.read<BillingStateManager>();
     await state.loadBooking(widget.booking);
-    _finishIfPaid(state);
   }
 
   Future<void> _payOrRefresh(bool refresh) async {
@@ -53,7 +52,6 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
     } else {
       await state.pay(_method);
     }
-    _finishIfPaid(state);
   }
 
   void _finishIfPaid(BillingStateManager state) {
@@ -62,6 +60,8 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
         !_didComplete &&
         invoice != null &&
         invoice.isPaid &&
+        state.exitToken?.invoiceId == invoice.id &&
+        (state.exitToken?.isValidAt(DateTime.now()) ?? false) &&
         invoice.bookingId == widget.booking.id) {
       _didComplete = true;
       widget.onPaymentCompleted(invoice.quote.total);
@@ -83,6 +83,11 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
         invoice != null &&
         ((invoice.status == 'pending' && session != null) ||
             (invoice.status == 'awaiting_guard' && _method == 'guard'));
+    final exitToken = invoice?.isPaid == true ? state.exitToken : null;
+    final canConfirmMock =
+        refresh &&
+        session?.provider == 'mock' &&
+        session?.mockWebhookToken != null;
     final date = DateFormat('d MMM, HH:mm');
     return Scaffold(
       backgroundColor: c.background,
@@ -245,6 +250,32 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
                         style: AppText.caption.copyWith(color: c.textSecondary),
                       ),
                   ],
+                  if (invoice?.isPaid == true) ...[
+                    const SizedBox(height: AppSpace.lg),
+                    Text(
+                      'Payment confirmed',
+                      style: AppText.title.copyWith(color: c.textPrimary),
+                    ),
+                    if (exitToken != null) ...[
+                      Center(
+                        child: QrImageView(
+                          size: 180,
+                          backgroundColor: Colors.white,
+                          data: exitToken.token,
+                        ),
+                      ),
+                      Text(
+                        exitToken.isMock
+                            ? 'Offline demo pass · cannot open a gate'
+                            : 'Paid exit pass · single use',
+                        textAlign: TextAlign.center,
+                      ),
+                      Text(
+                        'Expires ${date.format(colomboTime(exitToken.expiresAt))} · Colombo',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
                   if (state.isForecastLoading) ...[
                     const SizedBox(height: AppSpace.xl),
                     Text(
@@ -274,7 +305,13 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
               child: Column(
                 children: [
                   PrimaryButton(
-                    text: refresh
+                    text: invoice?.isPaid == true
+                        ? (exitToken?.isValidAt(DateTime.now()) == true
+                              ? 'Finish demo exit'
+                              : 'Get exit pass')
+                        : canConfirmMock
+                        ? 'Confirm mock'
+                        : refresh
                         ? 'Check status'
                         : _method == 'guard'
                         ? 'Pay at booth'
@@ -282,7 +319,20 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
                     isLoading: state.isBusy,
                     onPressed: quote == null || _didComplete
                         ? null
-                        : () => _payOrRefresh(refresh),
+                        : () async {
+                            if (invoice?.isPaid == true) {
+                              if (state.exitToken?.isValidAt(DateTime.now()) ==
+                                  true) {
+                                _finishIfPaid(state);
+                              } else {
+                                await state.refreshInvoice();
+                              }
+                            } else if (canConfirmMock) {
+                              await state.confirmMockPayment();
+                            } else {
+                              await _payOrRefresh(refresh);
+                            }
+                          },
                   ),
                   const SizedBox(height: AppSpace.xs),
                   Text(

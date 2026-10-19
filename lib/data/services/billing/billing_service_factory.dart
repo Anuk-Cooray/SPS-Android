@@ -2,8 +2,8 @@ import '../service_contracts.dart';
 import 'http_billing_service.dart';
 import 'mock_billing_service.dart';
 
-/// Switch only here. The default runs entirely offline.
-const bool useBackend = false;
+/// Opt in with --dart-define=BILLING_USE_BACKEND=true; default is offline.
+const bool useBackend = bool.fromEnvironment('BILLING_USE_BACKEND');
 
 const backendBaseUrl = String.fromEnvironment(
   'BILLING_BASE_URL',

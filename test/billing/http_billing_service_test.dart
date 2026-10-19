@@ -45,7 +45,15 @@ void main() {
           'body': body,
         });
         Object response;
-        if (request.uri.path == '/api/v1/billing/quote') {
+        if (request.uri.path.contains('/bookings/')) {
+          request.response.statusCode = 404;
+          response = {
+            'error': {
+              'code': 'INVOICE_NOT_FOUND',
+              'message': 'Invoice not found',
+            },
+          };
+        } else if (request.uri.path == '/api/v1/billing/quote') {
           response = issuedQuote;
         } else if (request.uri.path.endsWith('/pay')) {
           response = {
@@ -77,7 +85,11 @@ void main() {
         lotId: 'lot-main',
         arrivalExtensionFee: 50,
       );
-      final firstBody = requests.first['body'] as Map;
+      final firstBody =
+          requests.firstWhere(
+                (entry) => entry['path'] == '/api/v1/billing/quote',
+              )['body']
+              as Map;
       expect(firstBody['entry_time'], '2026-10-19T04:30:00.000Z');
       expect(firstBody['arrival_extension_fee'], 50);
       expect(firstBody['extension_minutes'], 0);
@@ -111,6 +123,83 @@ void main() {
         hasLength(1),
       );
       expect(Invoice.fromJson(invoice.toJson()).toJson(), invoice.toJson());
+    },
+  );
+
+  test(
+    'new client resumes stored invoice, confirms mock and fetches paid pass',
+    () async {
+      var paid = false;
+      final callbackBodies = <Map<String, dynamic>>[];
+      server.listen((request) async {
+        final text = await utf8.decoder.bind(request).join();
+        Object response;
+        if (request.uri.path.endsWith('/webhooks/mock')) {
+          callbackBodies.add(
+            Map<String, dynamic>.from(jsonDecode(text) as Map),
+          );
+          paid = true;
+          response = {'received': true, 'status': 'paid'};
+        } else if (request.uri.path.endsWith('/exit-token')) {
+          expect(paid, isTrue);
+          response = {
+            'invoice_id': 'invoice',
+            'token': 'signed-pass',
+            'expires_at': DateTime.now()
+                .toUtc()
+                .add(const Duration(minutes: 5))
+                .toIso8601String(),
+            'is_mock': false,
+          };
+        } else if (request.uri.path.endsWith('/pay')) {
+          response = {
+            'id': 'session',
+            'invoice_id': 'invoice',
+            'method': 'stripe',
+            'provider': 'mock',
+            'status': 'pending',
+            'is_mock': true,
+            'message': 'Mock pending',
+            'amount_minor': 10000,
+            'currency': 'LKR',
+            'mock_webhook_token': 'opaque-test-token',
+          };
+        } else {
+          // An existing invoice is discovered by booking even with a fresh app cache.
+          expect(request.method, 'GET');
+          response = {
+            'id': 'invoice',
+            'booking_id': 'BK-HTTP',
+            'quote': issuedQuote,
+            'status': paid ? 'paid' : 'pending',
+          };
+        }
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode(response));
+        await request.response.close();
+      });
+      final quote = await service.quoteFee(
+        bookingId: 'BK-HTTP',
+        entryTime: DateTime.parse('2026-10-19T04:30:00Z'),
+        exitTime: DateTime.parse('2026-10-19T08:30:00Z'),
+        lotId: 'lot-main',
+      );
+      final invoice = await service.createInvoice(
+        bookingId: 'BK-HTTP',
+        quote: quote,
+      );
+      final session = await service.startPayment(
+        invoiceId: invoice.id,
+        method: 'stripe',
+      );
+      expect(paid, isFalse);
+      expect((await service.confirmMockPayment(session)).isPaid, isTrue);
+      expect(callbackBodies.single['token'], 'opaque-test-token');
+      expect(callbackBodies.single['amount_minor'], 10000);
+      final pass = await service.getExitToken(invoice.id);
+      expect(pass.token, 'signed-pass');
+      expect(pass.isValidAt(DateTime.now()), isTrue);
+      expect(pass.isMock, isFalse);
     },
   );
 

@@ -1,3 +1,5 @@
+import '../../models/billing/exit_token.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -102,7 +104,22 @@ class HttpBillingService implements BillingService {
     String? upgradeToSlotId,
   }) async {
     // Resume an existing invoice, including after the screen is reopened.
-    final existing = _invoicesByBooking[bookingId];
+    var existing = _invoicesByBooking[bookingId];
+    if (existing == null) {
+      try {
+        existing = Invoice.fromJson(
+          _object(
+            await _request(
+              'GET',
+              'billing/bookings/${Uri.encodeComponent(bookingId)}/invoice',
+            ),
+          ),
+        );
+        _invoicesByBooking[bookingId] = existing;
+      } on BillingApiException catch (error) {
+        if (error.code != 'INVOICE_NOT_FOUND') rethrow;
+      }
+    }
     if (existing != null) {
       final latest = await getInvoice(existing.id);
       _quotes[bookingId] = latest.quote;
@@ -177,6 +194,38 @@ class HttpBillingService implements BillingService {
     _invoicesByBooking[invoice.bookingId] = invoice;
     return invoice;
   }
+
+  @override
+  Future<Invoice> confirmMockPayment(PaymentSession session) async {
+    if (!session.isMock ||
+        session.provider != 'mock' ||
+        session.mockWebhookToken == null) {
+      throw StateError('This session cannot be confirmed as a mock payment');
+    }
+    await _request(
+      'POST',
+      'billing/webhooks/mock',
+      body: {
+        'invoice_id': session.invoiceId,
+        'session_id': session.id,
+        'token': session.mockWebhookToken,
+        'amount_minor': session.amountMinor,
+        'currency': session.currency,
+        'status': 'paid',
+      },
+    );
+    return getInvoice(session.invoiceId);
+  }
+
+  @override
+  Future<ExitToken> getExitToken(String invoiceId) async => ExitToken.fromJson(
+    _object(
+      await _request(
+        'GET',
+        'billing/invoices/${Uri.encodeComponent(invoiceId)}/exit-token',
+      ),
+    ),
+  );
 
   @override
   Future<List<DemandForecastPoint>> getDemandForecast({

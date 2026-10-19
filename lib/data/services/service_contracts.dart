@@ -1,3 +1,4 @@
+import '../models/billing/exit_token.dart';
 import '../models/billing/demand_forecast_point.dart';
 import '../models/billing/fee_quote.dart';
 import '../models/billing/invoice.dart';
@@ -68,6 +69,8 @@ abstract interface class BillingService {
     required String method,
   });
   Future<Invoice> getInvoice(String invoiceId);
+  Future<Invoice> confirmMockPayment(PaymentSession session);
+  Future<ExitToken> getExitToken(String invoiceId);
   Future<List<DemandForecastPoint>> getDemandForecast({
     required String lotId,
     int horizonHours = 24,
