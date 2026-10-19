@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -93,6 +94,24 @@ class AiOccupancyService implements LotOccupancyService {
       throw AiApiException(_message(response.body));
     }
   }
+
+  /// Sends a phone-captured image to the existing FastAPI /api/upload endpoint.
+  /// The backend runs YOLO and exposes the annotated result at processed.jpg.
+  Future<void> uploadImage(Uint8List bytes, {required String filename}) async {
+    final request =
+        http.MultipartRequest('POST', Uri.parse('$baseUrl/api/upload'))
+          ..files.add(
+            http.MultipartFile.fromBytes('file', bytes, filename: filename),
+          );
+    final streamed = await request.send().timeout(const Duration(seconds: 30));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AiApiException(_message(response.body));
+    }
+  }
+
+  static String processedImageUrl([int? cacheKey]) =>
+      '$baseUrl/api/processed.jpg?t=${cacheKey ?? DateTime.now().millisecondsSinceEpoch}';
 
   SlotState _state(String? value) => switch (value) {
     'available' => SlotState.free,

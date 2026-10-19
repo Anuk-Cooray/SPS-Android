@@ -7,6 +7,7 @@ import '../../data/models/parking_lot_model.dart';
 import '../../data/models/parking_slot_model.dart';
 import '../../data/services/ai_occupancy_service.dart';
 import '../../data/services/parking_state_manager.dart';
+import 'camera_detection_screen.dart';
 
 /// Slot board for the single lot calibrated against the YOLO camera. It never
 /// treats an unknown/offline response as available.
@@ -34,6 +35,14 @@ class AiSlotBoardScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Live parking availability'),
         actions: [
+          IconButton(
+            tooltip: 'Camera detection',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CameraDetectionScreen()),
+            ),
+            icon: const Icon(Icons.camera_alt_rounded),
+          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: state.isAiRefreshing ? null : state.refreshAiOccupancy,
