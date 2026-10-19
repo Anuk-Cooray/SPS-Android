@@ -118,9 +118,9 @@ class AdminDashboardScreen extends StatelessWidget {
                     Text('Occupancy by hour', style: AppText.title.copyWith(color: c.textPrimary)),
                     Row(
                       children: [
-                        _legendDot(c.primary, 'Today'),
+                        _legendDot(c.primary, 'Today', c),
                         const SizedBox(width: AppSpace.md),
-                        _legendDot(c.slotTaken, 'Last week'),
+                        _legendDot(c.slotTaken, 'Last week', c),
                       ],
                     ),
                   ],
@@ -383,7 +383,7 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _legendDot(Color color, String label) {
+  Widget _legendDot(Color color, String label, AppColors c) {
     return Row(
       children: [
         Container(
@@ -392,7 +392,7 @@ class AdminDashboardScreen extends StatelessWidget {
           decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: AppSpace.xxs),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(label, style: TextStyle(fontSize: 11, color: c.textSecondary)),
       ],
     );
   }

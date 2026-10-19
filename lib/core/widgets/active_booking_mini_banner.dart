@@ -41,17 +41,17 @@ class ActiveBookingMiniBanner extends StatelessWidget {
       statusSubtitle = minutesLeft > 0
           ? 'In Transit · Arriving in $minutesLeft mins ($arriveFormatted)'
           : 'In Transit · Arriving now ($arriveFormatted)';
-      indicatorColor = const Color(0xFF10B981); // Green
+      indicatorColor = c.accent;
     } else if (!booking.isHoldExpired) {
       final rem = booking.remainingHoldDuration;
       final m = rem.inMinutes;
       final s = rem.inSeconds % 60;
       final timeStr = '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
       statusSubtitle = 'Hold Active: $timeStr left to reach barrier';
-      indicatorColor = m < 3 ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
+      indicatorColor = m < 3 ? c.danger : c.warning;
     } else {
       statusSubtitle = 'Hold Expired · Auto-cancelled';
-      indicatorColor = const Color(0xFFEF4444);
+      indicatorColor = c.danger;
     }
 
     return Container(

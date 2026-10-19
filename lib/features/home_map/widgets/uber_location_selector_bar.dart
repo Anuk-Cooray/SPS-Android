@@ -61,8 +61,8 @@ class UberLocationSelectorBar extends StatelessWidget {
                     Container(
                       width: 10,
                       height: 10,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF10B981), // Uber green
+                      decoration: BoxDecoration(
+                        color: c.accent,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -113,7 +113,7 @@ class UberLocationSelectorBar extends StatelessWidget {
                               Text(
                                 'START / PICKUP',
                                 style: AppText.caption.copyWith(
-                                  color: const Color(0xFF10B981),
+                                  color: c.accent,
                                   fontSize: 9,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.8,
@@ -248,8 +248,8 @@ class UberLocationSelectorBar extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: destination.congestionLevel == 'Extreme' ||
                             destination.congestionLevel == 'Very High'
-                        ? const Color(0xFFEF4444).withValues(alpha: 0.12)
-                        : const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                        ? c.danger.withValues(alpha: 0.12)
+                        : c.warning.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -257,8 +257,8 @@ class UberLocationSelectorBar extends StatelessWidget {
                     style: AppText.caption.copyWith(
                       color: destination.congestionLevel == 'Extreme' ||
                               destination.congestionLevel == 'Very High'
-                          ? const Color(0xFFEF4444)
-                          : const Color(0xFFD97706),
+                          ? c.danger
+                          : c.warning,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),

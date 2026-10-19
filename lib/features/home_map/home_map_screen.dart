@@ -184,8 +184,8 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                               Container(
                                 width: 7,
                                 height: 7,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF10B981),
+                                decoration: BoxDecoration(
+                                  color: c.accent,
                                   shape: BoxShape.circle,
                                 ),
                               ),

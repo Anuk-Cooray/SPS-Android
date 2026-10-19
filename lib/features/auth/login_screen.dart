@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../data/services/parking_state_manager.dart';
@@ -19,7 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
   // 0: Email Entry, 1: 6-Digit OTP Verification
   int _step = 0;
 
-  final _emailController = TextEditingController(text: 'anuk@example.com');
+  final _emailController = TextEditingController(
+    text: AppConfig.kDemoMode ? 'anuk@example.com' : '',
+  );
   final List<TextEditingController> _otpControllers =
       List.generate(6, (i) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (i) => FocusNode());
@@ -289,26 +292,25 @@ class _LoginScreenState extends State<LoginScreen> {
           style: AppText.body.copyWith(color: c.textSecondary),
         ),
 
-        const SizedBox(height: AppSpace.lg),
-
         // Preset quick chips for convenient campus testing
-        Wrap(
-          spacing: AppSpace.sm,
-          children: [
-            ActionChip(
-              avatar: const Icon(Icons.account_circle_outlined, size: 16),
-              label: const Text('anuk@example.com'),
-              onPressed: () => _selectPresetEmail('anuk@example.com'),
-            ),
-            ActionChip(
-              avatar: const Icon(Icons.school_outlined, size: 16),
-              label: const Text('driver@sliit.lk'),
-              onPressed: () => _selectPresetEmail('driver@sliit.lk'),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: AppSpace.xl),
+        if (AppConfig.kDemoMode) ...[
+          Wrap(
+            spacing: AppSpace.sm,
+            children: [
+              ActionChip(
+                avatar: const Icon(Icons.account_circle_outlined, size: 16),
+                label: const Text('anuk@example.com'),
+                onPressed: () => _selectPresetEmail('anuk@example.com'),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.school_outlined, size: 16),
+                label: const Text('driver@sliit.lk'),
+                onPressed: () => _selectPresetEmail('driver@sliit.lk'),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.xl),
+        ],
 
         // Email Field
         Text('Campus Email Address', style: AppText.label.copyWith(color: c.textSecondary)),
@@ -466,7 +468,7 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: AppSpace.lg),
 
         // In-App Verification Alert Banner (Research & Testing Convenience)
-        if (_lastSentCode != null)
+        if (AppConfig.kDemoMode && _lastSentCode != null)
           Container(
             padding: const EdgeInsets.all(AppSpace.md),
             decoration: BoxDecoration(

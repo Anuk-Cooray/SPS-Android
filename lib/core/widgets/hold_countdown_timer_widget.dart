@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../config/app_config.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/services/parking_state_manager.dart';
 
@@ -126,10 +127,10 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.sm),
       decoration: BoxDecoration(
-        color: (isInTransit ? const Color(0xFF10B981) : statusColor).withValues(alpha: 0.08),
+        color: (isInTransit ? c.accent : statusColor).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppRadius.input),
         border: Border.all(
-          color: (isInTransit ? const Color(0xFF10B981) : statusColor).withValues(alpha: 0.3),
+          color: (isInTransit ? c.accent : statusColor).withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -142,7 +143,7 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
                     ? Icons.directions_car_rounded
                     : (isExpired ? Icons.cancel_outlined : Icons.timer_outlined),
                 size: 16,
-                color: isInTransit ? const Color(0xFF10B981) : statusColor,
+                color: isInTransit ? c.accent : statusColor,
               ),
               const SizedBox(width: AppSpace.xs),
               Expanded(
@@ -151,65 +152,67 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
                       ? 'In transit · Arriving at $arriveFormatted'
                       : (isExpired ? 'Hold expired · Auto-released' : 'Hold expires in ${_formatDuration(_remaining)}'),
                   style: AppText.caption.copyWith(
-                    color: isInTransit ? const Color(0xFF10B981) : statusColor,
+                    color: isInTransit ? c.accent : statusColor,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              if (isInTransit)
-                InkWell(
-                  onTap: () => state.fastForwardToArrivalTime(),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: c.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.fast_forward_rounded, size: 12, color: c.accent),
-                        const SizedBox(width: 2),
-                        Text(
-                          'To Arrival',
-                          style: AppText.overline.copyWith(
-                            color: c.textPrimary,
-                            fontWeight: FontWeight.w700,
+              if (AppConfig.kDemoMode) ...[
+                if (isInTransit)
+                  InkWell(
+                    onTap: () => state.fastForwardToArrivalTime(),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: c.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.fast_forward_rounded, size: 12, color: c.accent),
+                          const SizedBox(width: 2),
+                          Text(
+                            'To Arrival',
+                            style: AppText.overline.copyWith(
+                              color: c.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                    ),
+                  )
+                else if (!isExpired)
+                  InkWell(
+                    onTap: () => state.fastForwardHoldTimer(remaining: const Duration(seconds: 10)),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: c.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.bolt_rounded, size: 12, color: c.accent),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Test 10s',
+                            style: AppText.overline.copyWith(
+                              color: c.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                )
-              else if (!isExpired)
-                InkWell(
-                  onTap: () => state.fastForwardHoldTimer(remaining: const Duration(seconds: 10)),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: c.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.bolt_rounded, size: 12, color: c.accent),
-                        const SizedBox(width: 2),
-                        Text(
-                          'Test 10s',
-                          style: AppText.overline.copyWith(
-                            color: c.textPrimary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              ],
             ],
           ),
           if (!isInTransit && !isExpired) ...[
@@ -241,7 +244,7 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
     final seconds = _remaining.inSeconds % 60;
     final isInTransit = widget.booking.isInTransit && widget.booking.holdExpiresAt == null;
     final arriveFormatted = DateFormat('h:mm a').format(widget.booking.arrivalTime);
-    final activeStatusColor = isInTransit ? const Color(0xFF10B981) : statusColor;
+    final activeStatusColor = isInTransit ? c.accent : statusColor;
 
     return Container(
       padding: const EdgeInsets.all(AppSpace.lg),
@@ -264,27 +267,34 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: activeStatusColor,
-                      shape: BoxShape.circle,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: activeStatusColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpace.xs),
-                  Text(
-                    isInTransit ? 'TRIP IN PROGRESS' : 'HOLD RESERVATION TIMER',
-                    style: AppText.overline.copyWith(
-                      color: c.textSecondary,
-                      letterSpacing: 1.1,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(width: AppSpace.xs),
+                    Flexible(
+                      child: Text(
+                        isInTransit ? 'TRIP IN PROGRESS' : 'HOLD RESERVATION TIMER',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.overline.copyWith(
+                          color: c.textSecondary,
+                          letterSpacing: 1.1,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: AppSpace.xs),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -328,13 +338,17 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
                 ),
               ),
               const SizedBox(width: AppSpace.sm),
-              Text(
-                isInTransit
-                    ? 'until arrival ($arriveFormatted)'
-                    : (isExpired ? 'auto-released' : 'remaining hold'),
-                style: AppText.caption.copyWith(
-                  color: c.textSecondary,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  isInTransit
+                      ? 'until arrival ($arriveFormatted)'
+                      : (isExpired ? 'auto-released' : 'remaining hold'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(
+                    color: c.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -366,82 +380,86 @@ class _HoldCountdownTimerWidgetState extends State<HoldCountdownTimerWidget> {
             ),
           ),
 
-          if (isInTransit) ...[
-            const SizedBox(height: AppSpace.md),
-            const Divider(),
-            const SizedBox(height: AppSpace.xs),
+          if (AppConfig.kDemoMode) ...[
+            if (isInTransit) ...[
+              const SizedBox(height: AppSpace.md),
+              const Divider(),
+              const SizedBox(height: AppSpace.xs),
 
-            // In-Transit Fast Forward Controls
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: c.textPrimary,
-                  side: BorderSide(color: c.border),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.input),
-                  ),
-                ),
-                icon: Icon(Icons.fast_forward_rounded, size: 16, color: c.accent),
-                label: Text(
-                  'Fast-Forward to Arrival Time ($arriveFormatted)',
-                  style: AppText.caption.copyWith(fontWeight: FontWeight.w700),
-                ),
-                onPressed: () {
-                  state.fastForwardToArrivalTime();
-                },
-              ),
-            ),
-          ] else if (!isExpired) ...[
-            const SizedBox(height: AppSpace.md),
-            const Divider(),
-            const SizedBox(height: AppSpace.xs),
-
-            // Evaluation / Demo Simulation Row
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: c.textPrimary,
-                      side: BorderSide(color: c.border),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.input),
-                      ),
-                    ),
-                    icon: Icon(Icons.bolt_rounded, size: 16, color: c.accent),
-                    label: Text(
-                      'Test Auto-Release (10s)',
-                      style: AppText.caption.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    onPressed: () {
-                      state.fastForwardHoldTimer(remaining: const Duration(seconds: 10));
-                    },
-                  ),
-                ),
-                const SizedBox(width: AppSpace.sm),
-                OutlinedButton.icon(
+              // In-Transit Fast Forward Controls
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: c.textPrimary,
                     side: BorderSide(color: c.border),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.input),
                     ),
                   ),
-                  icon: const Icon(Icons.add_alarm_rounded, size: 16),
+                  icon: Icon(Icons.fast_forward_rounded, size: 16, color: c.accent),
                   label: Text(
-                    '+5m',
+                    'Fast-Forward to Arrival Time ($arriveFormatted)',
                     style: AppText.caption.copyWith(fontWeight: FontWeight.w700),
                   ),
                   onPressed: () {
-                    state.extendHoldDuration(extension: const Duration(minutes: 5));
+                    state.fastForwardToArrivalTime();
                   },
                 ),
-              ],
-            ),
+              ),
+            ] else if (!isExpired) ...[
+              const SizedBox(height: AppSpace.md),
+              const Divider(),
+              const SizedBox(height: AppSpace.xs),
+
+              // Evaluation / Demo Simulation Row
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 36),
+                        foregroundColor: c.textPrimary,
+                        side: BorderSide(color: c.border),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.input),
+                        ),
+                      ),
+                      icon: Icon(Icons.bolt_rounded, size: 16, color: c.accent),
+                      label: Text(
+                        'Test Auto-Release (10s)',
+                        style: AppText.caption.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: () {
+                        state.fastForwardHoldTimer(remaining: const Duration(seconds: 10));
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.sm),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      foregroundColor: c.textPrimary,
+                      side: BorderSide(color: c.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.input),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add_alarm_rounded, size: 16),
+                    label: Text(
+                      '+5m',
+                      style: AppText.caption.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    onPressed: () {
+                      state.extendHoldDuration(extension: const Duration(minutes: 5));
+                    },
+                  ),
+                ],
+              ),
+            ],
           ],
         ],
       ),

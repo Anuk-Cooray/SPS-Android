@@ -117,12 +117,12 @@ class BookingConfirmedDialog extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.14),
+              color: c.accent.withValues(alpha: 0.14),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.check_circle_rounded,
-              color: Color(0xFF10B981),
+              color: c.accent,
               size: 38,
             ),
           ),
@@ -229,7 +229,7 @@ class BookingConfirmedDialog extends StatelessWidget {
                         Text(
                           '15m window starts upon arrival',
                           style: AppText.caption.copyWith(
-                            color: const Color(0xFF10B981),
+                            color: c.accent,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                           ),

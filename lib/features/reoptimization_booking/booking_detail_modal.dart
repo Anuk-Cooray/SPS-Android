@@ -537,8 +537,8 @@ class BookingDetailModal extends StatelessWidget {
         label = 'Upgraded Bay';
         break;
       case BookingStatus.checkedIn:
-        bg = Colors.green.withValues(alpha: 0.15);
-        fg = Colors.green.shade800;
+        bg = c.accentSoft;
+        fg = c.accent;
         label = 'Parked at Bay';
         break;
       case BookingStatus.reserved:
@@ -558,8 +558,8 @@ class BookingDetailModal extends StatelessWidget {
         label = status == BookingStatus.autoCancelled ? 'Auto-Cancelled' : 'Cancelled';
         break;
       case BookingStatus.extended:
-        bg = Colors.amber.withValues(alpha: 0.2);
-        fg = Colors.amber.shade900;
+        bg = c.warningSoft;
+        fg = c.warning;
         label = 'Extended';
         break;
     }

@@ -128,7 +128,7 @@ class _ColomboSearchModalState extends State<ColomboSearchModal> {
                   widget.isSelectingPickup
                       ? Icons.trip_origin_rounded
                       : Icons.location_on_rounded,
-                  color: widget.isSelectingPickup ? const Color(0xFF10B981) : c.textPrimary,
+                  color: widget.isSelectingPickup ? c.accent : c.textPrimary,
                   size: 24,
                 ),
                 const SizedBox(width: AppSpace.sm),
@@ -197,7 +197,7 @@ class _ColomboSearchModalState extends State<ColomboSearchModal> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
               itemCount: _categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, i) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final cat = _categories[index];
                 final isSelected = _selectedCategory == cat;
@@ -248,7 +248,7 @@ class _ColomboSearchModalState extends State<ColomboSearchModal> {
                 : ListView.separated(
                     padding: const EdgeInsets.all(AppSpace.lg),
                     itemCount: results.length,
-                    separatorBuilder: (_, __) => const Divider(height: 12),
+                    separatorBuilder: (_, i) => const Divider(height: 12),
                     itemBuilder: (context, index) {
                       final item = results[index];
                       final distKm = item.distanceToKm(
@@ -308,13 +308,13 @@ class _ColomboSearchModalState extends State<ColomboSearchModal> {
                                               vertical: 2,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                              color: c.danger.withValues(alpha: 0.12),
                                               borderRadius: BorderRadius.circular(4),
                                             ),
                                             child: Text(
                                               'Crowded',
                                               style: AppText.caption.copyWith(
-                                                color: const Color(0xFFEF4444),
+                                                color: c.danger,
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w700,
                                               ),

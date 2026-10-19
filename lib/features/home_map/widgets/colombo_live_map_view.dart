@@ -142,7 +142,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981),
+                          color: c.accent,
                           borderRadius: BorderRadius.circular(6),
                           boxShadow: [
                             BoxShadow(
@@ -165,7 +165,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                         width: 18,
                         height: 18,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981),
+                          color: c.accent,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [

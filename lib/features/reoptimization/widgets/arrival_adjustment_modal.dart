@@ -96,12 +96,12 @@ class ArrivalAdjustmentModal extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.14),
+                  color: c.warning.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.traffic_rounded,
-                  color: Color(0xFFD97706),
+                  color: c.warning,
                   size: 24,
                 ),
               ),
@@ -153,7 +153,7 @@ class ArrivalAdjustmentModal extends StatelessWidget {
                         Text(
                           reqFormatted,
                           style: AppText.body.copyWith(
-                            color: const Color(0xFFEF4444),
+                            color: c.danger,
                             fontWeight: FontWeight.w700,
                             decoration: TextDecoration.lineThrough,
                           ),
@@ -162,13 +162,13 @@ class ArrivalAdjustmentModal extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                            color: c.danger.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             '-${result.lateByMinutes}m late',
                             style: AppText.caption.copyWith(
-                              color: const Color(0xFFEF4444),
+                              color: c.danger,
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                             ),
@@ -219,7 +219,7 @@ class ArrivalAdjustmentModal extends StatelessWidget {
                         Text(
                           '15m Hold Window: $recFormatted – $holdExpiryFormatted',
                           style: AppText.caption.copyWith(
-                            color: const Color(0xFF10B981),
+                            color: c.accent,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -229,13 +229,13 @@ class ArrivalAdjustmentModal extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.14),
+                        color: c.accent.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         recFormatted,
                         style: AppText.body.copyWith(
-                          color: const Color(0xFF10B981),
+                          color: c.accent,
                           fontWeight: FontWeight.w800,
                           fontSize: 14,
                         ),
