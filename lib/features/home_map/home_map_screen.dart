@@ -1,9 +1,16 @@
+// home_map_screen.dart
+// Interactive Colombo Live Map with Uber-Style Location Search, Dual Navigation, and Parking Discovery
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/campus_map_view.dart';
+import '../../core/utils/google_maps_launcher.dart';
+import '../../data/models/colombo_landmark_model.dart';
 import '../../data/models/parking_lot_model.dart';
+import '../../data/services/colombo_location_service.dart';
 import '../../data/services/parking_state_manager.dart';
+import 'widgets/colombo_live_map_view.dart';
+import 'widgets/uber_location_selector_bar.dart';
 
 class HomeMapScreen extends StatefulWidget {
   final ValueChanged<ParkingLot> onSelectLot;
@@ -15,107 +22,135 @@ class HomeMapScreen extends StatefulWidget {
 }
 
 class _HomeMapScreenState extends State<HomeMapScreen> {
-  String? _selectedLotId = 'lot-main';
+  late ColomboLandmark _pickup;
+  late ColomboLandmark _destination;
+  late List<ParkingLot> _activeLots;
+  String? _selectedLotId;
+
+  @override
+  void initState() {
+    super.initState();
+    // Default Pickup: Current Location (SLIIT Malabe)
+    _pickup = ColomboLocationService.getLandmarkById('sliit-malabe');
+    // Default Destination: SLIIT Malabe Campus (Search bar allows picking any Colombo landmark)
+    _destination = ColomboLocationService.getLandmarkById('sliit-malabe');
+    _updateActiveLots();
+  }
+
+  void _updateActiveLots() {
+    // If destination is SLIIT, prioritize live StateManager lots
+    if (_destination.id == 'sliit-malabe') {
+      final stateLots = context.read<ParkingStateManager>().lots;
+      _activeLots = stateLots.isNotEmpty ? stateLots : _destination.nearbyLots;
+    } else {
+      _activeLots = _destination.nearbyLots;
+    }
+
+    if (_activeLots.isNotEmpty) {
+      _selectedLotId = _activeLots.first.id;
+    } else {
+      _selectedLotId = null;
+    }
+  }
+
+  void _swapLocations() {
+    setState(() {
+      final temp = _pickup;
+      _pickup = _destination;
+      _destination = temp;
+      _updateActiveLots();
+    });
+  }
+
+  ParkingLot? get _selectedLot {
+    if (_activeLots.isEmpty) return null;
+    return _activeLots.firstWhere(
+      (l) => l.id == _selectedLotId,
+      orElse: () => _activeLots.first,
+    );
+  }
+
+  void _launchGoogleMapsNavigation() async {
+    final lot = _selectedLot;
+    if (lot == null) return;
+
+    final success = await GoogleMapsLauncher.launchNavigation(
+      destinationLat: lot.latitude,
+      destinationLng: lot.longitude,
+      originLat: _pickup.latitude,
+      originLng: _pickup.longitude,
+      destinationLabel: '${lot.name} (${_destination.name})',
+    );
+
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not launch external Google Maps app. Opening browser directions...',
+            style: AppText.caption.copyWith(color: Colors.white),
+          ),
+          backgroundColor: Colors.black87,
+        ),
+      );
+    }
+  }
+
+  void _launchInAppSmartNavigation() {
+    final lot = _selectedLot;
+    if (lot == null) return;
+    widget.onSelectLot(lot);
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final state = context.watch<ParkingStateManager>();
-    final lots = state.lots;
+    final lot = _selectedLot;
 
     return Scaffold(
       backgroundColor: c.background,
       body: Stack(
         children: [
-          // 1. Campus Map Canvas
+          // 1. Interactive Colombo Live Map with real OSM / Carto tiles
           Positioned.fill(
-            child: CampusMapView(
-              lots: lots,
+            child: ColomboLiveMapView(
+              pickup: _pickup,
+              destination: _destination,
+              activeLots: _activeLots,
               selectedLotId: _selectedLotId,
-              onLotSelected: (lot) {
-                setState(() => _selectedLotId = lot.id);
-                widget.onSelectLot(lot);
+              onLotSelected: (selectedLot) {
+                setState(() => _selectedLotId = selectedLot.id);
               },
+              onRecenter: () {},
             ),
           ),
 
-          // 2. Top Search & Filter Bar
+          // 2. Uber-Style Dual Pickup & Destination Selector Bar
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpace.lg,
-                vertical: AppSpace.sm,
-              ),
-              child: Row(
-                children: [
-                  // Search field
-                  Expanded(
-                    child: Container(
-                      height: 52,
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
-                      decoration: BoxDecoration(
-                        color: c.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: c.border),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          )
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.search_rounded, color: c.textPrimary, size: 22),
-                          const SizedBox(width: AppSpace.sm),
-                          Expanded(
-                            child: Text(
-                              'SLIIT Malabe Campus',
-                              style: AppText.body.copyWith(
-                                color: c.textPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: AppSpace.sm),
-
-                  // Filter button
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: c.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.tune_rounded, color: c.textPrimary, size: 22),
-                      onPressed: () {},
-                    ),
-                  ),
-                ],
-              ),
+            child: UberLocationSelectorBar(
+              pickup: _pickup,
+              destination: _destination,
+              onPickupChanged: (newPickup) {
+                setState(() {
+                  _pickup = newPickup;
+                  _updateActiveLots();
+                });
+              },
+              onDestinationChanged: (newDest) {
+                setState(() {
+                  _destination = newDest;
+                  _updateActiveLots();
+                });
+              },
+              onSwap: _swapLocations,
+              onFilterTap: () => Navigator.pushNamed(context, '/admin'),
             ),
           ),
 
-          // 3. Draggable Bottom Sheet for Nearby Lots
+          // 3. Draggable Bottom Sheet for Nearby Parking Lots & Navigation Options
           DraggableScrollableSheet(
-            initialChildSize: 0.42,
+            initialChildSize: 0.48,
             minChildSize: 0.22,
-            maxChildSize: 0.75,
+            maxChildSize: 0.85,
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
@@ -123,9 +158,9 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                   borderRadius: AppRadius.sheetR,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, -4),
+                      color: Colors.black.withValues(alpha: 0.14),
+                      blurRadius: 22,
+                      offset: const Offset(0, -6),
                     )
                   ],
                 ),
@@ -145,7 +180,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                         height: 4,
                         margin: const EdgeInsets.only(bottom: AppSpace.md),
                         decoration: BoxDecoration(
-                          color: c.slotTaken,
+                          color: c.border,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -155,30 +190,166 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Parking nearby',
-                          style: AppText.h2.copyWith(color: c.textPrimary),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Parking near ${_destination.name}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.h2.copyWith(
+                                  color: c.textPrimary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_activeLots.length} facilities · ${_destination.zone}',
+                                style: AppText.caption.copyWith(color: c.textSecondary),
+                              ),
+                            ],
+                          ),
                         ),
-                        Text(
-                          'Live · updated now',
-                          style: AppText.caption.copyWith(color: c.textSecondary),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: c.surfaceMuted,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: c.border),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF10B981),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Live',
+                                style: AppText.caption.copyWith(
+                                  color: c.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
 
                     const SizedBox(height: AppSpace.md),
 
+                    // Dual Navigation Quick Action Bar
+                    Container(
+                      padding: const EdgeInsets.all(AppSpace.sm),
+                      decoration: BoxDecoration(
+                        color: c.surfaceMuted,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: c.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.directions_car_rounded, size: 16, color: c.accent),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  lot != null
+                                      ? 'Navigate to ${lot.name}'
+                                      : 'Select parking lot to navigate',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.caption.copyWith(
+                                    color: c.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              // In-App Smart Re-Optimization Navigation
+                              Expanded(
+                                flex: 6,
+                                child: ElevatedButton.icon(
+                                  onPressed: lot != null ? _launchInAppSmartNavigation : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: c.accent,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.navigation_rounded, size: 16),
+                                  label: const Text(
+                                    'In-App Nav',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(width: 8),
+
+                              // Launch External Google Maps App
+                              Expanded(
+                                flex: 5,
+                                child: OutlinedButton.icon(
+                                  onPressed: lot != null ? _launchGoogleMapsNavigation : null,
+                                  style: OutlinedButton.styleFrom(
+                                    backgroundColor: c.surface,
+                                    foregroundColor: c.textPrimary,
+                                    side: BorderSide(color: c.border),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.map_rounded, size: 16),
+                                  label: const Text(
+                                    'Google Maps',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpace.md),
+
                     // Lots list
-                    ...lots.map((lot) {
-                      final isSelected = lot.id == _selectedLotId;
+                    ..._activeLots.map((l) {
+                      final isSelected = l.id == _selectedLotId;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpace.sm),
                         child: _LotCard(
-                          lot: lot,
+                          lot: l,
                           isSelected: isSelected,
                           onTap: () {
-                            setState(() => _selectedLotId = lot.id);
-                            widget.onSelectLot(lot);
+                            setState(() => _selectedLotId = l.id);
+                            widget.onSelectLot(l);
                           },
                         ),
                       );
@@ -219,8 +390,8 @@ class _LotCard extends StatelessWidget {
           color: c.surface,
           borderRadius: BorderRadius.circular(AppRadius.card),
           border: Border.all(
-            color: isSelected ? c.textPrimary : c.border,
-            width: isSelected ? 1.5 : 1.0,
+            color: isSelected ? c.accent : c.border,
+            width: isSelected ? 2.0 : 1.0,
           ),
         ),
         child: Row(
@@ -230,15 +401,15 @@ class _LotCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: isSelected ? c.primary : c.surfaceMuted,
+                color: isSelected ? c.accent : c.surfaceMuted,
                 borderRadius: BorderRadius.circular(12),
               ),
               alignment: Alignment.center,
               child: Text(
                 'P',
                 style: AppText.title.copyWith(
-                  color: isSelected ? c.onPrimary : c.textSecondary,
-                  fontWeight: FontWeight.w700,
+                  color: isSelected ? Colors.white : c.textSecondary,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
@@ -250,38 +421,62 @@ class _LotCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    lot.name,
-                    style: AppText.title.copyWith(
-                      color: c.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          lot.name,
+                          style: AppText.body.copyWith(
+                            color: c.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (isSelected)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: c.accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Selected',
+                            style: AppText.caption.copyWith(
+                              color: c.accent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
-                    '${lot.distanceMeters} m from destination · LKR ${lot.hourlyRate}/h',
+                    '${lot.distanceMeters}m walk to entrance · LKR ${lot.hourlyRate.toInt()}/h',
                     style: AppText.caption.copyWith(color: c.textSecondary),
                   ),
                 ],
               ),
             ),
 
-            // Free slots count
+            const SizedBox(width: AppSpace.sm),
+
+            // Slots count badge
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   isFull ? '0' : '${lot.freeSlots}',
                   style: AppText.h2.copyWith(
-                    color: isFull
-                        ? c.textTertiary
-                        : (isSelected ? c.accent : c.textPrimary),
-                    fontWeight: FontWeight.w700,
+                    color: isFull ? c.slotTaken : c.textPrimary,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 Text(
                   isFull ? 'full' : 'free',
-                  style: AppText.caption.copyWith(color: c.textSecondary),
+                  style: AppText.caption.copyWith(
+                    color: isFull ? c.slotTaken : c.textSecondary,
+                  ),
                 ),
               ],
             ),
