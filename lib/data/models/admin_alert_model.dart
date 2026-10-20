@@ -40,7 +40,7 @@ class AdminAlert {
     DateTime parseDate(dynamic val) {
       if (val is DateTime) return val;
       if (val is String && val.isNotEmpty) {
-        return DateTime.tryParse(val) ?? DateTime.now();
+        return DateTime.tryParse(val)?.toLocal() ?? DateTime.now();
       }
       try {
         return (val as dynamic).toDate() as DateTime;

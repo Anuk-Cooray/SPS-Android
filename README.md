@@ -82,11 +82,22 @@ npx firebase-tools setup:emulators:firestore
 ```
 
 ### 3. Running Emulator Suite
-Start the local Firebase Emulator Suite (Firestore on `8080`, Functions on `5001`, Emulator UI on `4000`):
+Start the local Firebase Emulator Suite (Auth on `9099`, Firestore on `8080`, Functions on `5001`, Emulator UI on `4000`). The app talks to the emulators under the project ID of the flavor you run (`dev` → `sps-app-dev`, `prod` → `sps-app-c3f90` per `android/app/src/<flavor>/google-services.json`), so start them with the same project. The functions read `HMAC_SECRET_KEY` as a secret; for the emulator put it in `functions/.secret.local` (git-ignored), otherwise the emulator tries Google Secret Manager and calls fail:
 ```bash
-npx firebase-tools emulators:start --only firestore,functions
+npx firebase-tools emulators:start --only auth,firestore,functions --project sps-app-dev
+```
+Seed the lots once per emulator start (admin-only; allowed unauthenticated under the emulator):
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"data":{}}' http://127.0.0.1:5001/sps-app-dev/us-central1/migrateLots
 ```
 Access the Emulator Web UI at `http://localhost:4000` to inspect live collections (`parking_lots`, subcollections `slots`, `bookings`, `parking_events`).
+
+Then run the app against the emulators. Sign-in uses the server-side OTP callables (`requestEmailOtp` / `verifyEmailOtp`) and a Firebase Auth custom token; under the emulator the code is also returned to the app and shown on the login screen. `EMULATOR_HOST` defaults to `127.0.0.1` (mapped to `10.0.2.2` on the Android emulator); set it to your machine's LAN IP for a physical device:
+```bash
+flutter run --flavor dev --dart-define=USE_EMULATORS=true
+```
+
+Windows troubleshooting: if the Firestore emulator exits with `Unable to establish loopback connection`, the JVM's socket temp path is too long — set `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:\Users\Public\sps-emu` (any short, existing folder). If functions fail to load with `fetch failed`, the runtime started too slowly (common under OneDrive) — set `FUNCTIONS_DISCOVERY_TIMEOUT=60`.
 
 ### 4. Running Backend Verification & Concurrency Tests
 Run the automated test suite directly against the live Firestore Emulator:

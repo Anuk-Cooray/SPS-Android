@@ -12,3 +12,6 @@ firestore-debug.log
 # Temporary files
 *.tmp
 *.log
+
+# Local emulator secrets
+.secret.local

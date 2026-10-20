@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'data/models/booking_model.dart';
 import 'data/models/parking_lot_model.dart';
@@ -24,7 +25,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
-    FirestoreService().initialize();
+    FirestoreService().initialize(
+      useEmulator: AppConfig.useEmulators,
+      emulatorHost: AppConfig.emulatorHost,
+    );
   } catch (e) {
     debugPrint('[Firebase] Initialization skipped or running offline: $e');
   }

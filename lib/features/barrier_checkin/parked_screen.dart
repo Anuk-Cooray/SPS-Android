@@ -1,10 +1,12 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../data/models/booking_model.dart';
 
-class ParkedScreen extends StatelessWidget {
+class ParkedScreen extends StatefulWidget {
   final Booking booking;
   final VoidCallback onExitParking;
 
@@ -15,8 +17,43 @@ class ParkedScreen extends StatelessWidget {
   });
 
   @override
+  State<ParkedScreen> createState() => _ParkedScreenState();
+}
+
+class _ParkedScreenState extends State<ParkedScreen> {
+  late final DateTime _parkedAt;
+  Timer? _ticker;
+
+  Booking get booking => widget.booking;
+  VoidCallback get onExitParking => widget.onExitParking;
+
+  @override
+  void initState() {
+    super.initState();
+    // The booking handed over may predate check-in; the screen opens at check-in
+    _parkedAt = booking.checkedInAt?.toLocal() ?? DateTime.now();
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final elapsed = DateTime.now().difference(_parkedAt);
+    final safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+    final bookedMinutes = max(1, booking.durationHours * 60);
+    final progress = (safeElapsed.inMinutes / bookedMinutes).clamp(0.0, 1.0);
+    final elapsedLabel = '${safeElapsed.inHours}:${(safeElapsed.inMinutes % 60).toString().padLeft(2, '0')}';
+    final hourlyRate = booking.durationHours > 0 ? booking.estimatedFee / booking.durationHours : 0;
+    final billedHours = max(1, (safeElapsed.inMinutes / 60).ceil());
+    final feeSoFar = (hourlyRate * billedHours).round();
 
     return Scaffold(
       backgroundColor: c.background,
@@ -93,7 +130,7 @@ class ParkedScreen extends StatelessWidget {
                 height: 240,
                 child: CustomPaint(
                   painter: _CircularTimerPainter(
-                    progress: 0.40,
+                    progress: progress,
                     trackColor: c.divider,
                     fillColor: c.primary,
                   ),
@@ -107,7 +144,7 @@ class ParkedScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '0:48',
+                          elapsedLabel,
                           style: AppText.display.copyWith(
                             color: c.textPrimary,
                             fontSize: 44,
@@ -172,7 +209,7 @@ class ParkedScreen extends StatelessWidget {
                               Text('In at', style: AppText.caption.copyWith(color: c.textSecondary)),
                               const SizedBox(height: 2),
                               Text(
-                                '10:21',
+                                DateFormat('HH:mm').format(_parkedAt),
                                 style: AppText.h2.copyWith(color: c.textPrimary),
                               ),
                             ],
@@ -194,7 +231,7 @@ class ParkedScreen extends StatelessWidget {
                               Text('Fee so far', style: AppText.caption.copyWith(color: c.textSecondary)),
                               const SizedBox(height: 2),
                               Text(
-                                'LKR 100',
+                                'LKR $feeSoFar',
                                 style: AppText.h2.copyWith(color: c.textPrimary),
                               ),
                             ],
@@ -241,20 +278,23 @@ class ParkedScreen extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Find my car',
-                                style: AppText.title.copyWith(color: c.textPrimary),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '210 m away · 3 min walk',
-                                style: AppText.caption.copyWith(color: c.textSecondary),
-                              ),
-                            ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Find my car',
+                                  style: AppText.title.copyWith(color: c.textPrimary),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '210 m away · 3 min walk',
+                                  style: AppText.caption.copyWith(color: c.textSecondary),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: AppSpace.sm),
                           OutlinedButton(
                             onPressed: () {
                               ScaffoldMessenger.of(context).showSnackBar(

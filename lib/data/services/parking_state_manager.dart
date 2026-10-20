@@ -18,6 +18,7 @@ import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import 'arrival_feasibility_service.dart';
 import 'cloud_functions_client.dart';
+import 'email_otp_auth.dart';
 import 'firestore_service.dart';
 import 'mock_data.dart';
 
@@ -67,6 +68,17 @@ class ParkingStateManager extends ChangeNotifier {
         _isLoggedIn = true;
       } else {
         _isLoggedIn = false;
+      }
+
+      // A cached profile only counts as a session if Firebase Auth restored the same user
+      if (_isLoggedIn && !_isTestRuntime) {
+        final authUser = await _firestore.auth.restoreSession();
+        if (authUser == null || authUser.email.toLowerCase() != _currentUser.email.toLowerCase()) {
+          _isLoggedIn = false;
+          await prefs.remove('sp_is_logged_in');
+        } else if (authUser.uid != _currentUser.id) {
+          _currentUser = _currentUser.copyWith(id: authUser.uid);
+        }
       }
 
       if (bookingsJson != null && bookingsJson.isNotEmpty) {
@@ -119,10 +131,13 @@ class ParkingStateManager extends ChangeNotifier {
         }
         notifyListeners();
       }
+    }, onError: (Object e) {
+      debugPrint('[Firestore] Lots stream error: $e');
     });
 
-    if (_currentUser.email.isNotEmpty) {
-      _bookingsSubscription?.cancel();
+    _bookingsSubscription?.cancel();
+    _bookingsSubscription = null;
+    if (canStreamUserBookings) {
       _bookingsSubscription = _firestore.streamUserBookings(_currentUser.id).listen((cloudBookings) {
         if (cloudBookings.isNotEmpty) {
           for (final b in cloudBookings) {
@@ -136,8 +151,19 @@ class ParkingStateManager extends ChangeNotifier {
           _refreshActiveBooking();
           notifyListeners();
         }
+      }, onError: (Object e) {
+        debugPrint('[Firestore] Bookings stream error: $e');
       });
     }
+  }
+
+  /// Bookings are readable only by their owner, so stream them only for a live Firebase
+  /// session that matches the loaded profile (never for the signed-out placeholder user).
+  @visibleForTesting
+  bool get canStreamUserBookings {
+    if (!_isLoggedIn) return false;
+    final authUser = _firestore.auth.currentUser;
+    return authUser != null && authUser.uid == _currentUser.id;
   }
 
   Future<void> _persistSession() async {
@@ -324,39 +350,45 @@ class ParkingStateManager extends ChangeNotifier {
     }
   }
 
-  // Auth & Profile (M1)
+  // Auth & Profile (M1) — identity comes from the Firebase Auth session only
   String? _activeVerificationEmail;
-  String? _activeGeneratedOtp;
+  String? _activeDemoOtp;
   DateTime? _otpExpiresAt;
 
   String? get activeVerificationEmail => _activeVerificationEmail;
-  String? get activeGeneratedOtp => _activeGeneratedOtp;
+
+  /// Code echoed by the server for on-screen display; only returned under the emulator.
+  String? get activeGeneratedOtp => _activeDemoOtp;
   DateTime? get otpExpiresAt => _otpExpiresAt;
 
-  /// Requests a real 6-digit OTP code for the given email, persisted to Firestore
-  Future<String> sendVerificationOtp(String email) async {
-    final cleanEmail = email.trim();
+  /// Asks the server to email a 6-digit code. Returns the demo code when the server
+  /// exposes it (emulator only), otherwise null. Throws [OtpAuthException] on failure.
+  Future<String?> sendVerificationOtp(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
     _activeVerificationEmail = cleanEmail;
-    final otp = await _firestore.sendEmailVerificationOtp(cleanEmail);
-    _activeGeneratedOtp = otp;
-    _otpExpiresAt = DateTime.now().add(const Duration(minutes: 5));
-    debugPrint('[Auth] Generated 6-digit verification code for $cleanEmail');
+    final result = await _firestore.sendEmailVerificationOtp(cleanEmail);
+    _activeDemoOtp = result.demoCode;
+    _otpExpiresAt = result.expiresAt ?? DateTime.now().add(const Duration(minutes: 5));
+    debugPrint('[Auth] Verification code requested for $cleanEmail');
     notifyListeners();
-    return otp;
+    return result.demoCode;
   }
 
-  /// Verifies the entered OTP and logs the driver in on success
+  /// Verifies the code on the server, signs in to Firebase Auth and loads the driver profile
   Future<OtpVerificationResult> verifyOtp(String email, String enteredOtp) async {
     final result = await _firestore.verifyEmailOtp(email, enteredOtp);
-    if (result.isValid) {
-      await login(email);
-      debugPrint('[Auth] Email $email verified successfully');
+    if (result.isValid && result.user != null) {
+      _activeDemoOtp = null;
+      await login(result.user!);
+      debugPrint('[Auth] Signed in as ${result.user!.uid}');
     }
     return result;
   }
 
-  Future<void> login(String email) async {
-    final cleanEmail = email.trim().toLowerCase();
+  /// Loads the profile for a user signed in through Firebase Auth. The profile id is always
+  /// the Auth uid, which is what the server stamps on bookings.
+  Future<void> login(AuthenticatedUser authUser) async {
+    final cleanEmail = authUser.email.trim().toLowerCase();
     _isLoggedIn = true;
 
     // Check Cloud Firestore for existing driver profile
@@ -366,13 +398,14 @@ class ParkingStateManager extends ChangeNotifier {
     } catch (_) {}
 
     if (cloudUser != null) {
-      _currentUser = cloudUser;
+      _currentUser = cloudUser.copyWith(id: authUser.uid, email: cleanEmail);
+      if (cloudUser.id != authUser.uid) unawaited(_firestore.saveUser(_currentUser));
     } else if (cleanEmail == 'anuk@example.com' || cleanEmail == 'anuk@sliit.lk') {
-      _currentUser = MockData.initialUser.copyWith(email: cleanEmail);
+      _currentUser = MockData.initialUser.copyWith(id: authUser.uid, email: cleanEmail);
       unawaited(_firestore.saveUser(_currentUser));
     } else {
       _currentUser = User(
-        id: 'usr-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        id: authUser.uid,
         name: cleanEmail.split('@').first.replaceAll('.', ' ').toUpperCase(),
         email: cleanEmail,
         phone: '+94 77 123 4567',
@@ -397,8 +430,10 @@ class ParkingStateManager extends ChangeNotifier {
 
   Future<void> logout() async {
     _isLoggedIn = false;
+    _activeDemoOtp = null;
     _lotsSubscription?.cancel();
     _bookingsSubscription?.cancel();
+    await _firestore.signOut();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('sp_is_logged_in');
@@ -913,7 +948,6 @@ class ParkingStateManager extends ChangeNotifier {
       unawaited(_firestore.acceptUpgradeOnServer(
         bookingId: updatedBooking.id,
         newSlotId: newSlot.id,
-        userId: _currentUser.id,
         currentEtaMinutes: _etaMinutes,
       ).catchError((e) {
         if (e is SlotCollisionException) {
@@ -981,7 +1015,6 @@ class ParkingStateManager extends ChangeNotifier {
     if (!_isTestRuntime) {
       unawaited(_firestore.extendHoldOnServer(
         bookingId: updated.id,
-        userId: _currentUser.id,
         minutes: minutes,
       ));
     }
@@ -1083,7 +1116,6 @@ class ParkingStateManager extends ChangeNotifier {
     if (!_isTestRuntime && !autoCancelled) {
       unawaited(_firestore.cancelBookingOnServer(
         bookingId: booking.id,
-        userId: _currentUser.id,
       ));
     }
 

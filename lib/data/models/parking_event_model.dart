@@ -57,7 +57,7 @@ class ParkingEvent {
           (t) => t.name == json['type'],
           orElse: () => ParkingEventType.booked,
         ),
-        timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
+        timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '')?.toLocal() ?? DateTime.now(),
         description: json['description'] as String? ?? '',
         metadata: (json['metadata'] as Map<String, dynamic>?) ?? const {},
       );

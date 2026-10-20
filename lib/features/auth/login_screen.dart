@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
+import '../../data/services/email_otp_auth.dart';
 import '../../data/services/parking_state_manager.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -132,7 +133,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() {
         _isSending = false;
-        _emailError = 'Failed to generate verification code. Please try again.';
+        _emailError = e is OtpAuthException
+            ? e.message
+            : 'Failed to generate verification code. Please try again.';
       });
     }
   }
@@ -177,7 +180,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     final state = context.read<ParkingStateManager>();
-    final code = await state.sendVerificationOtp(email);
+    final String? code;
+    try {
+      code = await state.sendVerificationOtp(email);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSending = false;
+        _otpError = e is OtpAuthException
+            ? e.message
+            : 'Failed to generate verification code. Please try again.';
+      });
+      return;
+    }
 
     if (!mounted) return;
 

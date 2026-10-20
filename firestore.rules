@@ -9,7 +9,7 @@ service cloud.firestore {
 
     // Helper: is the user the owner of the document
     function isOwner(userId) {
-      return isAuthenticated() && (request.auth.uid == userId || (request.auth.token.email != null && request.auth.token.email == userId));
+      return isAuthenticated() && (request.auth.uid == userId || (request.auth.token.email != null && request.auth.token.email_verified == true && request.auth.token.email == userId));
     }
 
     // Parking Lots: Read-only for clients, writes forbidden (server authority only)
@@ -57,9 +57,14 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
-    // Email OTP Verifications: Read/write for auth operations
+    // Email OTP Verifications: Server-only (issued & verified by requestEmailOtp / verifyEmailOtp)
     match /email_verifications/{email} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // Outbound mail queue (Trigger Email extension): Server-only
+    match /mail/{mailId} {
+      allow read, write: if false;
     }
 
     // Devices & Sensors: Read allowed for authenticated users (e.g. admin UI), writes forbidden

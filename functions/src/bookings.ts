@@ -19,6 +19,11 @@ import { isSizeCompatible, scoreSlot } from './scoring';
 import { evaluateArrivalFeasibility } from './feasibility';
 import { generateSignedQrToken } from './hmac_token';
 
+// Caller privileges resolved from the verified auth token (see auth_guard.ts)
+export interface CallerOptions {
+  isAdmin?: boolean;
+}
+
 // --- Business Logic Functions (invoked by Cloud Functions & Unit Tests) ---
 
 export async function createBookingLogic(
@@ -46,6 +51,10 @@ export async function createBookingLogic(
     throw new HttpsError('invalid-argument', 'Missing required booking parameters.');
   }
 
+  // Require an explicit UTC offset: a bare local time would be read in the server's timezone (UTC)
+  if (typeof arrivalTime !== 'string' || !/(Z|[+-]\d{2}:?\d{2})$/i.test(arrivalTime.trim())) {
+    throw new HttpsError('invalid-argument', 'arrivalTime must be an ISO-8601 timestamp with a UTC offset.');
+  }
   const arrivalDate = new Date(arrivalTime);
   if (isNaN(arrivalDate.getTime())) {
     throw new HttpsError('invalid-argument', 'Invalid arrival time format.');
@@ -215,7 +224,8 @@ export async function createBookingLogic(
 export async function cancelBookingLogic(
   db: admin.firestore.Firestore,
   authUid: string,
-  request: CancelBookingRequest
+  request: CancelBookingRequest,
+  options: CallerOptions = {}
 ): Promise<{ success: boolean; bookingId: string }> {
   const { bookingId } = request;
   if (!bookingId) {
@@ -234,7 +244,7 @@ export async function cancelBookingLogic(
     const booking = bookingDoc.data() as BookingDocument;
 
     // Verify authorization
-    if (booking.userId !== authUid && authUid !== 'admin' && authUid !== 'system') {
+    if (booking.userId !== authUid && !options.isAdmin) {
       throw new HttpsError('permission-denied', 'You do not have permission to cancel this booking.');
     }
 
@@ -293,11 +303,13 @@ export async function cancelBookingLogic(
 export async function checkInLogic(
   db: admin.firestore.Firestore,
   authUid: string,
-  request: CheckInRequest
+  request: CheckInRequest,
+  options: CallerOptions = {}
 ): Promise<{ success: boolean; bookingId: string; slotId: string }> {
   const { bookingId, qrToken } = request;
-  if (!qrToken && !bookingId) {
-    throw new HttpsError('invalid-argument', 'Missing qrToken or bookingId.');
+  // The QR token is the proof of reservation; a bookingId alone is never sufficient
+  if (!qrToken || typeof qrToken !== 'string') {
+    throw new HttpsError('invalid-argument', 'Missing qrToken.');
   }
 
   const now = new Date();
@@ -313,7 +325,7 @@ export async function checkInLogic(
         throw new HttpsError('not-found', `Booking ${bookingId} not found.`);
       }
       bookingData = doc.data() as BookingDocument;
-      if (qrToken && bookingData.qrToken !== qrToken) {
+      if (bookingData.qrToken !== qrToken) {
         throw new HttpsError('permission-denied', 'Invalid QR token for this booking.');
       }
     } else {
@@ -324,6 +336,10 @@ export async function checkInLogic(
       }
       bookingRef = querySnap.docs[0].ref;
       bookingData = querySnap.docs[0].data() as BookingDocument;
+    }
+
+    if (bookingData.userId !== authUid && !options.isAdmin) {
+      throw new HttpsError('permission-denied', 'You do not have permission to check in this booking.');
     }
 
     if (bookingData.status === 'checkedIn' || bookingData.status === 'completed') {
@@ -395,7 +411,8 @@ export async function checkInLogic(
 export async function extendHoldLogic(
   db: admin.firestore.Firestore,
   authUid: string,
-  request: ExtendHoldRequest
+  request: ExtendHoldRequest,
+  options: CallerOptions = {}
 ): Promise<{ success: boolean; holdExpiresAt: string; extensionsCount: number; extensionFee: number }> {
   const { bookingId, minutes = 15 } = request;
   if (!bookingId) {
@@ -412,7 +429,7 @@ export async function extendHoldLogic(
     }
 
     const booking = bookingDoc.data() as BookingDocument;
-    if (booking.userId !== authUid && authUid !== 'admin') {
+    if (booking.userId !== authUid && !options.isAdmin) {
       throw new HttpsError('permission-denied', 'Permission denied.');
     }
 
@@ -479,7 +496,8 @@ export async function extendHoldLogic(
 export async function acceptUpgradeLogic(
   db: admin.firestore.Firestore,
   authUid: string,
-  request: AcceptUpgradeRequest
+  request: AcceptUpgradeRequest,
+  options: CallerOptions = {}
 ): Promise<{
   success: boolean;
   bookingId: string;
@@ -510,7 +528,7 @@ export async function acceptUpgradeLogic(
     }
 
     const booking = bookingDoc.data() as BookingDocument;
-    if (booking.userId !== authUid && authUid !== 'admin') {
+    if (booking.userId !== authUid && !options.isAdmin) {
       throw new HttpsError('permission-denied', 'Permission denied.');
     }
 
