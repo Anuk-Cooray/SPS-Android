@@ -38,7 +38,7 @@ class MockData {
 
   static List<ParkingSlot> generateMainBuildingSlots() {
     return [
-      // Row A
+      // Row A -> Sector 1 (illustrative demo mapping)
       const ParkingSlot(
         id: 'A-01',
         lotId: 'lot-main',
@@ -47,6 +47,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.medium,
         walkingDistanceMeters: 160,
+        sector: 1,
       ),
       const ParkingSlot(
         id: 'A-02',
@@ -56,6 +57,7 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.medium,
         walkingDistanceMeters: 140,
+        sector: 1,
       ),
       const ParkingSlot(
         id: 'A-03',
@@ -65,6 +67,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.medium,
         walkingDistanceMeters: 110,
+        sector: 1,
       ),
       const ParkingSlot(
         id: 'A-04',
@@ -74,6 +77,7 @@ class MockData {
         state: SlotState.blocked,
         size: VehicleSize.medium,
         walkingDistanceMeters: 80,
+        sector: 1,
       ),
       const ParkingSlot(
         id: 'A-05',
@@ -83,6 +87,7 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.medium,
         walkingDistanceMeters: 60,
+        sector: 1,
       ),
       const ParkingSlot(
         id: 'A-06',
@@ -91,10 +96,11 @@ class MockData {
         number: 6,
         state: SlotState.free,
         size: VehicleSize.medium,
-        walkingDistanceMeters: 40, // Closest to entrance
+        walkingDistanceMeters: 40,
+        sector: 1,
       ),
 
-      // Row B
+      // Row B -> Sector 3
       const ParkingSlot(
         id: 'B-01',
         lotId: 'lot-main',
@@ -102,7 +108,8 @@ class MockData {
         number: 1,
         state: SlotState.free,
         size: VehicleSize.medium,
-        walkingDistanceMeters: 40, // Candidate upgrade
+        walkingDistanceMeters: 40,
+        sector: 3,
       ),
       const ParkingSlot(
         id: 'B-02',
@@ -112,6 +119,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.medium,
         walkingDistanceMeters: 65,
+        sector: 3,
       ),
       const ParkingSlot(
         id: 'B-03',
@@ -121,6 +129,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.medium,
         walkingDistanceMeters: 85,
+        sector: 3,
       ),
       const ParkingSlot(
         id: 'B-04',
@@ -130,6 +139,7 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.medium,
         walkingDistanceMeters: 90,
+        sector: 3,
       ),
       const ParkingSlot(
         id: 'B-05',
@@ -139,6 +149,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.medium,
         walkingDistanceMeters: 105,
+        sector: 3,
       ),
       const ParkingSlot(
         id: 'B-06',
@@ -148,9 +159,10 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.medium,
         walkingDistanceMeters: 110,
+        sector: 3,
       ),
 
-      // Additional slots to complete 24 slots (12 free, 11 taken, 1 blocked)
+      // Row C -> Sector 5
       const ParkingSlot(
         id: 'C-01',
         lotId: 'lot-main',
@@ -159,6 +171,7 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.medium,
         walkingDistanceMeters: 120,
+        sector: 5,
       ),
       const ParkingSlot(
         id: 'C-02',
@@ -168,6 +181,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.medium,
         walkingDistanceMeters: 130,
+        sector: 5,
       ),
       const ParkingSlot(
         id: 'C-03',
@@ -177,6 +191,7 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.medium,
         walkingDistanceMeters: 135,
+        sector: 5,
       ),
       const ParkingSlot(
         id: 'C-04',
@@ -186,6 +201,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.medium,
         walkingDistanceMeters: 140,
+        sector: 5,
       ),
       const ParkingSlot(
         id: 'C-05',
@@ -195,6 +211,7 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.medium,
         walkingDistanceMeters: 145,
+        sector: 5,
       ),
       const ParkingSlot(
         id: 'C-06',
@@ -204,7 +221,10 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.medium,
         walkingDistanceMeters: 150,
+        sector: 5,
       ),
+
+      // Row D -> Sector 7
       const ParkingSlot(
         id: 'D-01',
         lotId: 'lot-main',
@@ -213,6 +233,7 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.large,
         walkingDistanceMeters: 155,
+        sector: 7,
       ),
       const ParkingSlot(
         id: 'D-02',
@@ -222,6 +243,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.large,
         walkingDistanceMeters: 160,
+        sector: 7,
       ),
       const ParkingSlot(
         id: 'D-03',
@@ -231,6 +253,7 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.large,
         walkingDistanceMeters: 165,
+        sector: 7,
       ),
       const ParkingSlot(
         id: 'D-04',
@@ -240,6 +263,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.large,
         walkingDistanceMeters: 170,
+        sector: 7,
       ),
       const ParkingSlot(
         id: 'D-05',
@@ -249,6 +273,7 @@ class MockData {
         state: SlotState.free,
         size: VehicleSize.large,
         walkingDistanceMeters: 175,
+        sector: 7,
       ),
       const ParkingSlot(
         id: 'D-06',
@@ -258,6 +283,7 @@ class MockData {
         state: SlotState.taken,
         size: VehicleSize.large,
         walkingDistanceMeters: 180,
+        sector: 7,
       ),
     ];
   }
@@ -305,6 +331,7 @@ class MockData {
 
   static List<Booking> getInitialBookings() {
     final now = DateTime.now();
+
     return [
       Booking(
         id: 'BK-2041',

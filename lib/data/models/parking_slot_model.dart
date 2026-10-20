@@ -25,6 +25,7 @@ class ParkingSlot {
   final SlotType type;
   final int walkingDistanceMeters;
   final String cameraId;
+  final int sector;
 
   const ParkingSlot({
     required this.id,
@@ -33,9 +34,10 @@ class ParkingSlot {
     required this.number,
     required this.state,
     required this.size,
-    this.type = SlotType.normal,
     required this.walkingDistanceMeters,
+    this.type = SlotType.normal,
     this.cameraId = '',
+    this.sector = 1,
   });
 
   bool get isAvailable => state == SlotState.free;
@@ -50,6 +52,7 @@ class ParkingSlot {
     SlotType? type,
     int? walkingDistanceMeters,
     String? cameraId,
+    int? sector,
   }) {
     return ParkingSlot(
       id: id ?? this.id,
@@ -62,6 +65,7 @@ class ParkingSlot {
       walkingDistanceMeters:
           walkingDistanceMeters ?? this.walkingDistanceMeters,
       cameraId: cameraId ?? this.cameraId,
+      sector: sector ?? this.sector,
     );
   }
 }
