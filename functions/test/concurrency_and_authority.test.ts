@@ -378,7 +378,7 @@ describe('Server Reservation Authority & Concurrency Tests', () => {
         durationHours: 1,
       });
 
-      const checkInRes = await checkInLogic(db, 'cctv-gate', {
+      const checkInRes = await checkInLogic(db, 'driver-qr', {
         bookingId: booking.id,
         qrToken: booking.qrToken,
       });

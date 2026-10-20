@@ -49,7 +49,7 @@ class BookingCharge {
         type: json['type'] as String? ?? 'parking',
         amount: (json['amount'] as num?)?.toInt() ?? 0,
         currency: json['currency'] as String? ?? 'LKR',
-        timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+        timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '')?.toLocal() ??
             DateTime.now(),
         description: json['description'] as String? ?? '',
       );
@@ -258,10 +258,11 @@ class Booking {
 
   static DateTime? _parseDate(dynamic val) {
     if (val == null) return null;
-    if (val is DateTime) return val;
-    if (val is String && val.isNotEmpty) return DateTime.tryParse(val);
+    if (val is DateTime) return val.toLocal();
+    // Server timestamps are UTC ('...Z'); convert so formatting shows the device's local time
+    if (val is String && val.isNotEmpty) return DateTime.tryParse(val)?.toLocal();
     try {
-      return (val as dynamic).toDate() as DateTime;
+      return ((val as dynamic).toDate() as DateTime).toLocal();
     } catch (_) {
       return null;
     }

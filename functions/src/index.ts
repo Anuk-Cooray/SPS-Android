@@ -2,7 +2,7 @@
 // Smart Parking (J26-IT-335) — Firebase Cloud Functions & Server Authority Entry Point
 
 import * as admin from 'firebase-admin';
-import { onCall, onRequest } from 'firebase-functions/v2/https';
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import {
   createBookingLogic,
@@ -20,6 +20,8 @@ import { ingestOccupancyLogic } from './cctv';
 import { validateQrLogic } from './barrier';
 import { paymentCompletedLogic } from './payment';
 import { hmacSecretParam, generateSignedQrToken, verifySignedQrToken } from './hmac_token';
+import { resolveCaller, requireAdmin, isEmulatorOrTest } from './auth_guard';
+import { requestEmailOtpLogic, verifyEmailOtpLogic, queueOtpEmail } from './otp';
 
 // Initialize Firebase Admin
 if (admin.apps.length === 0) {
@@ -29,39 +31,41 @@ const db = admin.firestore();
 
 // --- Internal Mobile App Callables (Auth State Inherited from Flutter Client) ---
 
+// Caller identity is taken from the verified auth token only (demo fallback under emulator)
+
 // 1. Create Booking (Callable with atomic transaction)
 export const createBooking = onCall(
   { cors: true, secrets: [hmacSecretParam] },
   async (request) => {
-    const authUid = request.auth?.uid || (request.data?.userId as string) || 'demo-user';
-    return await createBookingLogic(db, authUid, request.data);
+    const caller = resolveCaller(request);
+    return await createBookingLogic(db, caller.uid, request.data);
   }
 );
 
 // 2. Cancel Booking (Callable with atomic transaction)
 export const cancelBooking = onCall({ cors: true }, async (request) => {
-  const authUid = request.auth?.uid || (request.data?.userId as string) || 'demo-user';
-  return await cancelBookingLogic(db, authUid, request.data);
+  const caller = resolveCaller(request);
+  return await cancelBookingLogic(db, caller.uid, request.data, { isAdmin: caller.isAdmin });
 });
 
-// 3. Barrier QR Check-In (Callable fallback for client app demo)
+// 3. QR Check-In (Callable fallback for client app demo; owner or admin only)
 export const checkIn = onCall({ cors: true }, async (request) => {
-  const authUid = request.auth?.uid || 'cctv-gate';
-  return await checkInLogic(db, authUid, request.data);
+  const caller = resolveCaller(request);
+  return await checkInLogic(db, caller.uid, request.data, { isAdmin: caller.isAdmin });
 });
 
 // 4. Extend Hold Window (+15 min, max 2 extensions)
 export const extendHold = onCall({ cors: true }, async (request) => {
-  const authUid = request.auth?.uid || (request.data?.userId as string) || 'demo-user';
-  return await extendHoldLogic(db, authUid, request.data);
+  const caller = resolveCaller(request);
+  return await extendHoldLogic(db, caller.uid, request.data, { isAdmin: caller.isAdmin });
 });
 
 // 5. Accept Dynamic In-Transit Upgrade (Atomic slot swap with signed token rotation)
 export const acceptUpgrade = onCall(
   { cors: true, secrets: [hmacSecretParam] },
   async (request) => {
-    const authUid = request.auth?.uid || (request.data?.userId as string) || 'demo-user';
-    return await acceptUpgradeLogic(db, authUid, request.data);
+    const caller = resolveCaller(request);
+    return await acceptUpgradeLogic(db, caller.uid, request.data, { isAdmin: caller.isAdmin });
   }
 );
 
@@ -80,18 +84,63 @@ export const autoReleaseExpiredHolds = onSchedule(
   }
 );
 
-// 7. Manual trigger for auto-release (Callable, for test verification and demo fast-forward)
+// 7. Manual trigger for auto-release (Admin only; demo fast-forward under emulator)
 export const triggerAutoRelease = onCall({ cors: true }, async (request) => {
+  requireAdmin(request);
   const refTime = request.data?.referenceTime
     ? new Date(request.data.referenceTime)
     : new Date();
+  if (isNaN(refTime.getTime())) {
+    throw new HttpsError('invalid-argument', 'Invalid referenceTime.');
+  }
   return await autoReleaseExpiredHoldsLogic(db, refTime);
 });
 
-// 8. Migration utility to populate subcollections
-export const migrateLots = onCall({ cors: true }, async () => {
+// 8. Migration utility to populate subcollections (Admin only)
+export const migrateLots = onCall({ cors: true }, async (request) => {
+  requireAdmin(request);
   return await migrateOrSeedLots(db);
 });
+
+// --- Email OTP Sign-In (server-issued codes, Firebase custom token on success) ---
+
+// 8a. Issue a 6-digit code (delivered via /mail; returned in the response only under the emulator)
+export const requestEmailOtp = onCall(
+  { cors: true, secrets: [hmacSecretParam] },
+  async (request) => {
+    const demo = isEmulatorOrTest();
+    const result = await requestEmailOtpLogic(db, request.data?.email, (email, code) =>
+      queueOtpEmail(db, email, code)
+    );
+    return {
+      sent: true,
+      expiresAt: result.expiresAt,
+      ...(demo ? { demoCode: result.code } : {}),
+    };
+  }
+);
+
+// 8b. Verify the code and mint a Firebase Auth custom token for signInWithCustomToken
+export const verifyEmailOtp = onCall(
+  { cors: true, secrets: [hmacSecretParam] },
+  async (request) => {
+    const { email } = await verifyEmailOtpLogic(db, request.data?.email, request.data?.code);
+
+    let user: admin.auth.UserRecord;
+    try {
+      user = await admin.auth().getUserByEmail(email);
+    } catch (error: any) {
+      if (error?.code !== 'auth/user-not-found') throw error;
+      user = await admin.auth().createUser({ email, emailVerified: true });
+    }
+    if (!user.emailVerified) {
+      await admin.auth().updateUser(user.uid, { emailVerified: true });
+    }
+
+    const customToken = await admin.auth().createCustomToken(user.uid);
+    return { uid: user.uid, customToken };
+  }
+);
 
 // --- External Component Authenticated HTTPS Endpoints (onRequest) ---
 

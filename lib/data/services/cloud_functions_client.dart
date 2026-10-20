@@ -40,6 +40,29 @@ class CloudFunctionsClient {
   bool _useEmulator = true;
   String _emulatorHost = '127.0.0.1';
   int _emulatorPort = 5001;
+  Future<String?> Function()? _idTokenProvider;
+
+  /// Upper bound on waiting for a callable's response, so a stalled server fails the call
+  /// (surfacing as 'unavailable') instead of leaving the UI waiting indefinitely.
+  static const Duration callTimeout = Duration(seconds: 30);
+
+  /// Supplies the signed-in user's Firebase ID token, sent as a Bearer token on callables
+  set idTokenProvider(Future<String?> Function()? provider) => _idTokenProvider = provider;
+
+  bool get useEmulator => _useEmulator;
+
+  /// Host the device should use to reach the local emulators.
+  /// In Android Emulator, localhost is 10.0.2.2. On Windows/Desktop/iOS it is 127.0.0.1.
+  static String resolveEmulatorHost(String host) {
+    try {
+      if (!kIsWeb && Platform.isAndroid && host == '127.0.0.1') {
+        return '10.0.2.2';
+      }
+    } catch (_) {}
+    return host;
+  }
+
+  String get emulatorHost => resolveEmulatorHost(_emulatorHost);
 
   void configure({
     String? projectId,
@@ -57,14 +80,7 @@ class CloudFunctionsClient {
 
   String get baseUrl {
     if (_useEmulator) {
-      // In Android Emulator, localhost is 10.0.2.2. On Windows/Desktop/iOS it is 127.0.0.1.
-      String host = _emulatorHost;
-      try {
-        if (!kIsWeb && Platform.isAndroid && host == '127.0.0.1') {
-          host = '10.0.2.2';
-        }
-      } catch (_) {}
-      return 'http://$host:$_emulatorPort/$_projectId/$_region';
+      return 'http://$emulatorHost:$_emulatorPort/$_projectId/$_region';
     }
     return 'https://$_region-$_projectId.cloudfunctions.net';
   }
@@ -86,12 +102,17 @@ class CloudFunctionsClient {
       request.headers.set('Content-Type', 'application/json; charset=utf-8');
       request.headers.set('Accept', 'application/json');
 
+      final idToken = await _idTokenProvider?.call();
+      if (idToken != null && idToken.isNotEmpty) {
+        request.headers.set('Authorization', 'Bearer $idToken');
+      }
+
       final bodyBytes = utf8.encode(jsonEncode({'data': data}));
       request.contentLength = bodyBytes.length;
       request.add(bodyBytes);
 
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
+      final response = await request.close().timeout(callTimeout);
+      final responseBody = await response.transform(utf8.decoder).join().timeout(callTimeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
@@ -118,7 +139,7 @@ class CloudFunctionsClient {
         }
 
         throw CloudFunctionsException(
-          code: status,
+          code: normalizeStatus(status),
           message: message,
           details: errorJson,
         );
@@ -127,6 +148,10 @@ class CloudFunctionsClient {
       client.close();
     }
   }
+
+  /// Converts callable protocol statuses (e.g. RESOURCE_EXHAUSTED) to
+  /// FunctionsErrorCode style codes (e.g. resource-exhausted).
+  static String normalizeStatus(String status) => status.toLowerCase().replaceAll('_', '-');
 
   /// Sends a raw HTTP POST request to an onRequest HTTPS Cloud Function (e.g. hardware integrations)
   Future<Map<String, dynamic>> postRaw(

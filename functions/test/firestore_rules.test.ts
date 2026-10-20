@@ -147,6 +147,44 @@ describe('Firestore Security Rules Unit Tests', () => {
     });
   });
 
+  describe('Email OTP Verifications & Mail Queue', () => {
+    it('denies all client reads and writes of OTP records and queued mail', async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await db.collection('email_verifications').doc('victim@sliit.lk').set({
+          otpHash: 'abc',
+          attempts: 0,
+        });
+        await db.collection('mail').doc('m1').set({ to: 'victim@sliit.lk' });
+      });
+
+      const anonDb = testEnv.unauthenticatedContext().firestore();
+      const userDb = testEnv
+        .authenticatedContext('user-001', { email: 'victim@sliit.lk', email_verified: true })
+        .firestore();
+
+      for (const db of [anonDb, userDb]) {
+        await assertFails(db.collection('email_verifications').doc('victim@sliit.lk').get());
+        await assertFails(
+          db.collection('email_verifications').doc('victim@sliit.lk').set({ otp: '123456' })
+        );
+        await assertFails(db.collection('mail').doc('m1').get());
+      }
+    });
+
+    it('requires a verified email claim to access an email-keyed user profile', async () => {
+      const unverified = testEnv
+        .authenticatedContext('user-x', { email: 'driver@sliit.lk', email_verified: false })
+        .firestore();
+      const verified = testEnv
+        .authenticatedContext('user-y', { email: 'driver@sliit.lk', email_verified: true })
+        .firestore();
+
+      await assertFails(unverified.collection('users').doc('driver@sliit.lk').get());
+      await assertSucceeds(verified.collection('users').doc('driver@sliit.lk').get());
+    });
+  });
+
   describe('Audit Telemetry Events', () => {
     it('denies clients from forging or writing audit events directly', async () => {
       const clientDb = testEnv.authenticatedContext('user-001').firestore();

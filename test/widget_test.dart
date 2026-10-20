@@ -4,12 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_parking/core/theme/app_theme.dart';
+import 'package:smart_parking/data/services/firestore_service.dart';
 import 'package:smart_parking/data/services/mock_data.dart';
 import 'package:smart_parking/data/services/parking_state_manager.dart';
 import 'package:smart_parking/features/reoptimization/navigation_screen.dart';
 import 'package:smart_parking/main.dart';
 
+import 'support/fake_auth_gateway.dart';
+
 void main() {
+  setUp(() {
+    FirestoreService().authGateway = FakeEmailOtpAuthGateway();
+  });
+
   void setPhoneSize(WidgetTester tester) {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.0;

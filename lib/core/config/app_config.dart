@@ -9,6 +9,15 @@ class AppConfig {
   /// Target deployment environment ('dev' or 'prod'), configurable via --dart-define=ENVIRONMENT=prod
   static const String environment = String.fromEnvironment('ENVIRONMENT', defaultValue: 'dev');
 
+  /// Routes Auth, Firestore and Cloud Functions to the local Firebase Emulator Suite
+  /// (--dart-define=USE_EMULATORS=true). Never honoured in production builds.
+  static const bool _kUseEmulatorsFromEnv = bool.fromEnvironment('USE_EMULATORS', defaultValue: false);
+
+  /// Emulator host (--dart-define=EMULATOR_HOST=...). 127.0.0.1 is mapped to 10.0.2.2 on Android.
+  static const String emulatorHost = String.fromEnvironment('EMULATOR_HOST', defaultValue: '127.0.0.1');
+
+  static bool get useEmulators => _kUseEmulatorsFromEnv && !isProduction;
+
   static bool get isProduction => environment == 'prod';
   static bool get isDevelopment => environment == 'dev';
 

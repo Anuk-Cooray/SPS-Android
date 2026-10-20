@@ -76,8 +76,8 @@ class TripTelemetry {
         predictedEtaMinProvider: (json['predictedEtaMinProvider'] as num?)?.toDouble() ?? 12.0,
         predictedEtaMinCorrected: (json['predictedEtaMinCorrected'] as num?)?.toDouble() ?? 14.0,
         actualTravelMin: (json['actualTravelMin'] as num?)?.toInt() ?? 15,
-        departureTime: DateTime.tryParse(json['departureTime'] as String? ?? '') ?? DateTime.now(),
-        arrivalTime: DateTime.tryParse(json['arrivalTime'] as String? ?? '') ?? DateTime.now(),
+        departureTime: DateTime.tryParse(json['departureTime'] as String? ?? '')?.toLocal() ?? DateTime.now(),
+        arrivalTime: DateTime.tryParse(json['arrivalTime'] as String? ?? '')?.toLocal() ?? DateTime.now(),
         dayOfWeek: (json['dayOfWeek'] as num?)?.toInt() ?? 1,
         hour: (json['hour'] as num?)?.toInt() ?? 8,
         distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 5.0,
@@ -85,6 +85,6 @@ class TripTelemetry {
         weatherFlag: (json['weatherFlag'] as num?)?.toInt() ?? 0,
         holidayFlag: (json['holidayFlag'] as num?)?.toInt() ?? 0,
         modelVersion: (json['modelVersion'] ?? 'v1.0.0-linear') as String,
-        loggedAt: DateTime.tryParse(json['loggedAt'] as String? ?? '') ?? DateTime.now(),
+        loggedAt: DateTime.tryParse(json['loggedAt'] as String? ?? '')?.toLocal() ?? DateTime.now(),
       );
 }

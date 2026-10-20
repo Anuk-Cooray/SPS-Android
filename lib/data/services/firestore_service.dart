@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/admin_alert_model.dart';
@@ -12,12 +13,14 @@ import '../models/trip_telemetry_model.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import 'cloud_functions_client.dart';
+import 'email_otp_auth.dart';
 
 class OtpVerificationResult {
   final bool isValid;
   final String? errorMessage;
+  final AuthenticatedUser? user;
 
-  const OtpVerificationResult({required this.isValid, this.errorMessage});
+  const OtpVerificationResult({required this.isValid, this.errorMessage, this.user});
 }
 
 class FirestoreService {
@@ -28,11 +31,18 @@ class FirestoreService {
   FirebaseFirestore? _firestore;
   bool _isAvailable = false;
   final CloudFunctionsClient _functions = CloudFunctionsClient();
-  final Map<String, Map<String, dynamic>> _localVerifications = {};
   final Map<String, User> _localUsers = {};
+  late EmailOtpAuthGateway _auth = FirebaseEmailOtpAuthGateway(_functions);
+
+  static const int authEmulatorPort = 9099;
+  static const int firestoreEmulatorPort = 8080;
 
   bool get isAvailable => _isAvailable;
   CloudFunctionsClient get functions => _functions;
+  EmailOtpAuthGateway get auth => _auth;
+
+  /// Replaces the sign-in backend (tests install a fake; the app always uses Firebase Auth).
+  set authGateway(EmailOtpAuthGateway gateway) => _auth = gateway;
 
   void initialize({
     bool useEmulator = false,
@@ -43,10 +53,18 @@ class FirestoreService {
       _firestore = FirebaseFirestore.instance;
       _isAvailable = true;
       _functions.configure(
+        projectId: Firebase.app().options.projectId,
         useEmulator: useEmulator,
         emulatorHost: emulatorHost,
         emulatorPort: emulatorPort,
       );
+      _functions.idTokenProvider = () => _auth.getIdToken();
+      if (useEmulator) {
+        final host = _functions.emulatorHost;
+        _firestore!.useFirestoreEmulator(host, firestoreEmulatorPort);
+        fb.FirebaseAuth.instance.useAuthEmulator(host, authEmulatorPort);
+        debugPrint('[FirestoreService] Using Firebase emulators at $host');
+      }
     } catch (e) {
       _isAvailable = false;
       debugPrint('[FirestoreService] Firestore unavailable (offline or desktop mode): $e');
@@ -69,9 +87,6 @@ class FirestoreService {
 
   CollectionReference<Map<String, dynamic>>? get _usersRef =>
       _isAvailable ? _firestore!.collection('users') : null;
-
-  CollectionReference<Map<String, dynamic>>? get _verificationsRef =>
-      _isAvailable ? _firestore!.collection('email_verifications') : null;
 
   CollectionReference<Map<String, dynamic>>? get _tripTelemetryRef =>
       _isAvailable ? _firestore!.collection('trip_telemetry') : null;
@@ -107,12 +122,11 @@ class FirestoreService {
       final payload = <String, dynamic>{
         'lotId': lotId,
         'slotId': slotId,
-        'userId': userId,
         'vehiclePlate': vehiclePlate,
         'vehicleSize': vehicleSize.name,
         'vehicleId': vehicleId ?? 'v-default',
         'vehicleType': vehicleType ?? 'sedan',
-        'arrivalTime': arrivalTime.toIso8601String(),
+        'arrivalTime': arrivalTime.toUtc().toIso8601String(),
         'durationHours': durationHours,
         if (originLat != null && originLng != null)
           'driverOrigin': {
@@ -133,41 +147,71 @@ class FirestoreService {
       // Pass collision exception directly to UI for "Slot just taken" prompt
       rethrow;
     } catch (e) {
+      // A missing or rejected session must not be masked by a fake local booking
+      if (e is CloudFunctionsException && (e.code == 'unauthenticated' || e.code == 'permission-denied')) {
+        rethrow;
+      }
       debugPrint('[FirestoreService] Server createBooking call failed ($e), executing local fallback');
-      // Offline fallback: generate local booking
-      final holdExpiresAt = arrivalTime.add(const Duration(minutes: 15));
-      return Booking(
-        id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-        userId: userId,
-        vehicleId: vehicleId ?? 'v-default',
-        vehiclePlate: vehiclePlate,
+      return _localFallbackBooking(
         lotId: lotId,
-        lotName: 'Campus Lot',
         slotId: slotId,
-        bookedAt: DateTime.now(),
+        userId: userId,
+        vehiclePlate: vehiclePlate,
         arrivalTime: arrivalTime,
         durationHours: durationHours,
-        status: BookingStatus.reserved,
-        estimatedFee: 100 * durationHours,
-        qrToken: 'QR-TOKEN-$slotId-${DateTime.now().millisecondsSinceEpoch}',
-        holdExpiresAt: holdExpiresAt,
-        predictedEtaMinBaseline: predictedEtaMinBaseline ?? 0.0,
-        predictedEtaMinProvider: predictedEtaMinProvider ?? 0.0,
-        predictedEtaMinCorrected: predictedEtaMinCorrected ?? 0.0,
-        modelVersion: modelVersion ?? 'v1.0.0-linear',
+        vehicleId: vehicleId,
+        predictedEtaMinBaseline: predictedEtaMinBaseline,
+        predictedEtaMinProvider: predictedEtaMinProvider,
+        predictedEtaMinCorrected: predictedEtaMinCorrected,
+        modelVersion: modelVersion,
       );
     }
+  }
+
+  /// Offline fallback: generate local booking
+  Booking _localFallbackBooking({
+    required String lotId,
+    required String slotId,
+    required String userId,
+    required String vehiclePlate,
+    required DateTime arrivalTime,
+    required int durationHours,
+    String? vehicleId,
+    double? predictedEtaMinBaseline,
+    double? predictedEtaMinProvider,
+    double? predictedEtaMinCorrected,
+    String? modelVersion,
+  }) {
+    final holdExpiresAt = arrivalTime.add(const Duration(minutes: 15));
+    return Booking(
+      id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+      userId: userId,
+      vehicleId: vehicleId ?? 'v-default',
+      vehiclePlate: vehiclePlate,
+      lotId: lotId,
+      lotName: 'Campus Lot',
+      slotId: slotId,
+      bookedAt: DateTime.now(),
+      arrivalTime: arrivalTime,
+      durationHours: durationHours,
+      status: BookingStatus.reserved,
+      estimatedFee: 100 * durationHours,
+      qrToken: 'QR-TOKEN-$slotId-${DateTime.now().millisecondsSinceEpoch}',
+      holdExpiresAt: holdExpiresAt,
+      predictedEtaMinBaseline: predictedEtaMinBaseline ?? 0.0,
+      predictedEtaMinProvider: predictedEtaMinProvider ?? 0.0,
+      predictedEtaMinCorrected: predictedEtaMinCorrected ?? 0.0,
+      modelVersion: modelVersion ?? 'v1.0.0-linear',
+    );
   }
 
   /// Invokes `cancelBooking` callable function to atomically release slot on the server
   Future<bool> cancelBookingOnServer({
     required String bookingId,
-    required String userId,
   }) async {
     try {
       final payload = <String, dynamic>{
         'bookingId': bookingId,
-        'userId': userId,
       };
       await _functions.call('cancelBooking', payload);
       debugPrint('[FirestoreService] Server booking cancellation confirmed: $bookingId');
@@ -213,13 +257,11 @@ class FirestoreService {
   /// Invokes `extendHold` callable function to add +15 min grace hold
   Future<Map<String, dynamic>?> extendHoldOnServer({
     required String bookingId,
-    required String userId,
     int minutes = 15,
   }) async {
     try {
       final payload = <String, dynamic>{
         'bookingId': bookingId,
-        'userId': userId,
         'minutes': minutes,
       };
       final res = await _functions.call('extendHold', payload);
@@ -235,14 +277,12 @@ class FirestoreService {
   Future<Map<String, dynamic>?> acceptUpgradeOnServer({
     required String bookingId,
     required String newSlotId,
-    required String userId,
     int currentEtaMinutes = 5,
   }) async {
     try {
       final payload = <String, dynamic>{
         'bookingId': bookingId,
         'newSlotId': newSlotId,
-        'userId': userId,
         'currentEtaMinutes': currentEtaMinutes,
       };
       final res = await _functions.call('acceptUpgrade', payload);
@@ -350,7 +390,7 @@ class FirestoreService {
               'walkingDistanceMeters': slot.walkingDistanceMeters,
               'state': slot.isAvailable ? 'available' : (slot.state == SlotState.blocked ? 'blocked' : 'occupied'),
               'bookingId': slot.bookingId,
-              'updatedAt': DateTime.now().toIso8601String(),
+              'updatedAt': DateTime.now().toUtc().toIso8601String(),
               'updatedBy': 'system',
             });
           }
@@ -425,7 +465,7 @@ class FirestoreService {
       await slotRef.set({
         'state': serverState,
         'bookingId': reservedBy,
-        'updatedAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
         'updatedBy': 'app',
       }, SetOptions(merge: true)).timeout(const Duration(seconds: 2));
     } catch (e) {
@@ -469,115 +509,24 @@ class FirestoreService {
     return _localUsers[cleanEmail];
   }
 
-  // --- Email OTP Verification Collection (M1) ---
+  // --- Email OTP Sign-In (M1) — issued & verified server-side only ---
 
-  Future<String> sendEmailVerificationOtp(String email) async {
-    final cleanEmail = email.trim().toLowerCase();
-    final random = Random();
-    final code = (100000 + random.nextInt(900000)).toString();
-    final now = DateTime.now();
-    final expiresAt = now.add(const Duration(minutes: 5));
-
-    final data = <String, dynamic>{
-      'email': cleanEmail,
-      'otp': code,
-      'createdAt': now.toIso8601String(),
-      'expiresAt': expiresAt.toIso8601String(),
-      'isVerified': false,
-      'attempts': 0,
-    };
-
-    _localVerifications[cleanEmail] = data;
-
-    if (_isAvailable && _verificationsRef != null) {
-      _verificationsRef!
-          .doc(cleanEmail)
-          .set(data)
-          .timeout(const Duration(seconds: 2))
-          .catchError((e) {
-        debugPrint('[FirestoreService] Offline or sync error for OTP: $e');
-      });
-    }
-
-    return code;
+  /// Asks the server to issue a code for [email]. Throws [OtpAuthException] on failure.
+  Future<OtpRequestResult> sendEmailVerificationOtp(String email) {
+    return _auth.requestOtp(email.trim().toLowerCase());
   }
 
+  /// Verifies the code on the server and signs in to Firebase Auth with the returned custom token.
   Future<OtpVerificationResult> verifyEmailOtp(String email, String enteredOtp) async {
-    final cleanEmail = email.trim().toLowerCase();
-    Map<String, dynamic>? record;
-
-    if (_isAvailable && _verificationsRef != null) {
-      try {
-        final doc = await _verificationsRef!
-            .doc(cleanEmail)
-            .get()
-            .timeout(const Duration(milliseconds: 1500));
-        if (doc.exists && doc.data() != null) {
-          record = doc.data();
-        }
-      } catch (e) {
-        debugPrint('[FirestoreService] Firestore get verification timeout, falling back to local: $e');
-      }
+    try {
+      final user = await _auth.verifyOtp(email.trim().toLowerCase(), enteredOtp.trim());
+      return OtpVerificationResult(isValid: true, user: user);
+    } on OtpAuthException catch (e) {
+      return OtpVerificationResult(isValid: false, errorMessage: e.message);
     }
-
-    record ??= _localVerifications[cleanEmail];
-
-    if (record == null) {
-      return const OtpVerificationResult(
-        isValid: false,
-        errorMessage: 'No verification record found. Please request a new code.',
-      );
-    }
-
-    final expiresAtStr = record['expiresAt'] as String?;
-    final expiresAt = expiresAtStr != null ? DateTime.tryParse(expiresAtStr) : null;
-    if (expiresAt != null && DateTime.now().isAfter(expiresAt)) {
-      return const OtpVerificationResult(
-        isValid: false,
-        errorMessage: 'Verification code has expired. Please request a new code.',
-      );
-    }
-
-    final attempts = (record['attempts'] as int? ?? 0) + 1;
-    record['attempts'] = attempts;
-
-    if (attempts > 5) {
-      return const OtpVerificationResult(
-        isValid: false,
-        errorMessage: 'Too many incorrect attempts. Please request a fresh code.',
-      );
-    }
-
-    final expectedOtp = record['otp'] as String? ?? '';
-    if (expectedOtp != enteredOtp.trim()) {
-      if (_isAvailable && _verificationsRef != null) {
-        _verificationsRef!
-            .doc(cleanEmail)
-            .update({'attempts': attempts})
-            .timeout(const Duration(seconds: 2))
-            .catchError((_) {});
-      }
-      final remaining = 5 - attempts;
-      return OtpVerificationResult(
-        isValid: false,
-        errorMessage: 'Incorrect code. $remaining attempt${remaining == 1 ? '' : 's'} remaining.',
-      );
-    }
-
-    record['isVerified'] = true;
-    if (_isAvailable && _verificationsRef != null) {
-      _verificationsRef!
-          .doc(cleanEmail)
-          .update({
-            'isVerified': true,
-            'verifiedAt': DateTime.now().toIso8601String(),
-          })
-          .timeout(const Duration(seconds: 2))
-          .catchError((_) {});
-    }
-
-    return const OtpVerificationResult(isValid: true);
   }
+
+  Future<void> signOut() => _auth.signOut();
 
   // --- Subsystem Hardware Integration Endpoints (CCTV, Barrier, Payment) ---
 
@@ -610,7 +559,7 @@ class FirestoreService {
       'slotId': slotId,
       'occupied': occupied,
       'confidence': confidence,
-      'timestamp': (timestamp ?? DateTime.now()).toIso8601String(),
+      'timestamp': (timestamp ?? DateTime.now()).toUtc().toIso8601String(),
       'violation': ?violation,
     };
     return await _functions.postRaw(
@@ -653,7 +602,7 @@ class FirestoreService {
       'paymentRef': paymentRef,
       'amountPaid': amountPaid,
       'paymentMethod': paymentMethod,
-      'timestamp': (timestamp ?? DateTime.now()).toIso8601String(),
+      'timestamp': (timestamp ?? DateTime.now()).toUtc().toIso8601String(),
     };
     return await _functions.postRaw(
       'paymentCompleted',

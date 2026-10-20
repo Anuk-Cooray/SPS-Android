@@ -38,6 +38,11 @@ android {
         }
     }
 
+    // AGP 9 disables resValue() by default; the flavors use it for app_name
+    buildFeatures {
+        resValues = true
+    }
+
     flavorDimensions += "default"
 
     productFlavors {
