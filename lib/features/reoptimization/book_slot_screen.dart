@@ -8,6 +8,7 @@ import '../../data/models/parking_lot_model.dart';
 import '../../data/models/parking_slot_model.dart';
 import '../../data/models/vehicle_model.dart';
 import '../../data/services/arrival_feasibility_service.dart';
+import '../../data/services/cloud_functions_client.dart';
 import '../../data/services/parking_state_manager.dart';
 import 'engine/slot_score_result.dart';
 import 'widgets/arrival_adjustment_modal.dart';
@@ -353,7 +354,7 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
           Navigator.of(context).pop();
         },
       );
-    } catch (e) {
+    } on SlotCollisionException {
       if (!mounted) return;
       final nextBest = state.findNextBestSlot(widget.lot, _selectedSlot.id);
       if (nextBest != null) {
@@ -370,6 +371,23 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           backgroundColor: const Color(0xFFD97706), // Amber warning
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final signedOut = e is CloudFunctionsException &&
+          (e.code == 'unauthenticated' || e.code == 'permission-denied');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            signedOut
+                ? 'Your session has expired. Please sign in again to book.'
+                : "Couldn't confirm your booking with the server. Check your connection and try again.",
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: const Color(0xFFDC2626), // Red error
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 4),
         ),
