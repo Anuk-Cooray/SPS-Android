@@ -1,0 +1,132 @@
+
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import 'service_contract.dart';
+
+class BarrierApiException implements Exception {
+  final String message;
+
+  const BarrierApiException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+class BarrierApiService implements BarrierService {
+  final String baseUrl;
+  final http.Client _client;
+  final Duration timeout;
+
+  BarrierApiService({
+    required this.baseUrl,
+    http.Client? client,
+    this.timeout = const Duration(seconds: 15),
+  }) : _client = client ?? http.Client();
+
+  Uri _buildUri(String path) {
+    final base = baseUrl.replaceFirst(RegExp(r'/$'), '');
+    return Uri.parse('$base$path');
+  }
+
+  Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      final response = await _client
+          .post(
+            _buildUri(path),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(timeout);
+
+      final dynamic decoded;
+
+      try {
+        decoded = jsonDecode(response.body);
+      } on FormatException {
+        throw BarrierApiException(
+          'Invalid server response (HTTP ${response.statusCode}).',
+        );
+      }
+
+      if (decoded is! Map<String, dynamic>) {
+        throw const BarrierApiException(
+          'The server returned an unexpected response.',
+        );
+      }
+
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300) {
+        throw BarrierApiException(
+          decoded['detail']?.toString() ??
+              decoded['message']?.toString() ??
+              'Request failed (HTTP ${response.statusCode}).',
+        );
+      }
+
+      return decoded;
+    } on BarrierApiException {
+      rethrow;
+    } on http.ClientException {
+      throw const BarrierApiException(
+        'Cannot connect to the backend. Check its address and status.',
+      );
+    } on Exception catch (error) {
+      throw BarrierApiException('Request failed: $error');
+    }
+  }
+
+  @override
+  Future<bool> verifyAndOpenBarrier({
+    required String bookingId,
+    required String qrToken,
+  }) async {
+    if (bookingId.trim().isEmpty || qrToken.trim().isEmpty) {
+      throw const BarrierApiException(
+        'Booking ID and QR token are required.',
+      );
+    }
+
+    final response = await _postJson(
+      '/api/barrier/verify',
+      {
+        'booking_id': bookingId,
+        'qr_token': qrToken,
+      },
+    );
+
+    return response['authorized'] == true &&
+        response['barrier_opened'] == true;
+  }
+
+  @override
+  Future<Map<String, dynamic>> getWalkingDirectionsToCar({
+    required String slotId,
+    required double userLat,
+    required double userLng,
+  }) async {
+    if (slotId.trim().isEmpty) {
+      throw const BarrierApiException('Slot ID is required.');
+    }
+
+    return _postJson(
+      '/api/navigation/walking-directions',
+      {
+        'slot_id': slotId,
+        'user_lat': userLat,
+        'user_lng': userLng,
+      },
+    );
+  }
+
+  void dispose() {
+    _client.close();
+  }
+}
