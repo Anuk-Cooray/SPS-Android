@@ -15,8 +15,7 @@ class BarrierApiException implements Exception {
 }
 
 class BarrierApiService implements BarrierService {
-  // Android emulator -> host computer.
-  // Use http://127.0.0.1:8000 for requests made on the host itself.
+  // Address for an Android emulator connecting to FastAPI on the host PC.
   final String baseUrl;
   final http.Client _client;
   final Duration timeout;
@@ -85,7 +84,7 @@ class BarrierApiService implements BarrierService {
     }
   }
 
-  // QR barrier verification.
+  // Verify a booking QR token and request barrier authorization.
   @override
   Future<bool> verifyAndOpenBarrier({
     required String bookingId,
@@ -109,7 +108,7 @@ class BarrierApiService implements BarrierService {
         response['barrier_opened'] == true;
   }
 
-  // Walking directions.
+  // Request walking directions to a parked car.
   @override
   Future<Map<String, dynamic>> getWalkingDirectionsToCar({
     required String slotId,
@@ -130,7 +129,8 @@ class BarrierApiService implements BarrierService {
     );
   }
 
-  // Find My Car: predict the first-floor sector from six BLE RSSI values.
+  // Predict a first-floor sector from six BLE RSSI readings.
+  // Input order: B1, B2, B3, B4, B5, B6.
   Future<int> predictSector({
     required double b1,
     required double b2,
@@ -142,12 +142,7 @@ class BarrierApiService implements BarrierService {
     final response = await _postJson(
       '/api/navigation/predict-sector',
       {
-        'B1': b1,
-        'B2': b2,
-        'B3': b3,
-        'B4': b4,
-        'B5': b5,
-        'B6': b6,
+        'rssi': [b1, b2, b3, b4, b5, b6],
       },
     );
 

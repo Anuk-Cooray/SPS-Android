@@ -1,0 +1,285 @@
+
+/// Indoor parking route-planning service.
+///
+/// Uses a predefined parking layout and Dijkstra's algorithm
+/// to calculate the shortest walkable route.
+///
+/// Distances and connections are sample data for demonstration.
+class IndoorRouteNode {
+  final String id;
+  final String label;
+
+  const IndoorRouteNode({
+    required this.id,
+    required this.label,
+  });
+}
+
+class IndoorRouteEdge {
+  final String from;
+  final String to;
+  final double distanceMeters;
+
+  const IndoorRouteEdge({
+    required this.from,
+    required this.to,
+    required this.distanceMeters,
+  });
+}
+
+class IndoorRouteResult {
+  final List<IndoorRouteNode> nodes;
+  final double totalDistanceMeters;
+  final List<String> instructions;
+
+  const IndoorRouteResult({
+    required this.nodes,
+    required this.totalDistanceMeters,
+    required this.instructions,
+  });
+
+  List<String> get nodeIds =>
+      nodes.map((node) => node.id).toList(growable: false);
+}
+
+class IndoorRouteService {
+  static const String entranceId = 'entrance';
+
+  static const List<IndoorRouteNode> _nodes = [
+    IndoorRouteNode(id: 'entrance', label: 'Main Entrance'),
+    IndoorRouteNode(id: 'junction_a', label: 'Junction A'),
+    IndoorRouteNode(id: 'junction_b', label: 'Junction B'),
+    IndoorRouteNode(id: 'junction_c', label: 'Junction C'),
+    IndoorRouteNode(id: 'aisle_west', label: 'West Aisle'),
+    IndoorRouteNode(id: 'aisle_center', label: 'Main Aisle'),
+    IndoorRouteNode(id: 'aisle_east', label: 'East Aisle'),
+    IndoorRouteNode(id: 'sector_1', label: 'Sector 1'),
+    IndoorRouteNode(id: 'sector_2', label: 'Sector 2'),
+    IndoorRouteNode(id: 'sector_3', label: 'Sector 3'),
+    IndoorRouteNode(id: 'sector_4', label: 'Sector 4'),
+    IndoorRouteNode(id: 'sector_5', label: 'Sector 5'),
+    IndoorRouteNode(id: 'sector_6', label: 'Sector 6'),
+    IndoorRouteNode(id: 'sector_7', label: 'Sector 7'),
+  ];
+
+  static const List<IndoorRouteEdge> _edges = [
+    IndoorRouteEdge(
+      from: 'entrance',
+      to: 'junction_a',
+      distanceMeters: 8,
+    ),
+    IndoorRouteEdge(
+      from: 'junction_a',
+      to: 'aisle_west',
+      distanceMeters: 6,
+    ),
+    IndoorRouteEdge(
+      from: 'junction_a',
+      to: 'aisle_center',
+      distanceMeters: 5,
+    ),
+    IndoorRouteEdge(
+      from: 'aisle_west',
+      to: 'sector_1',
+      distanceMeters: 5,
+    ),
+    IndoorRouteEdge(
+      from: 'aisle_west',
+      to: 'sector_2',
+      distanceMeters: 7,
+    ),
+    IndoorRouteEdge(
+      from: 'aisle_center',
+      to: 'junction_b',
+      distanceMeters: 8,
+    ),
+    IndoorRouteEdge(
+      from: 'junction_b',
+      to: 'sector_3',
+      distanceMeters: 6,
+    ),
+    IndoorRouteEdge(
+      from: 'junction_b',
+      to: 'sector_4',
+      distanceMeters: 7,
+    ),
+    IndoorRouteEdge(
+      from: 'junction_b',
+      to: 'aisle_east',
+      distanceMeters: 5,
+    ),
+    IndoorRouteEdge(
+      from: 'aisle_east',
+      to: 'sector_5',
+      distanceMeters: 5,
+    ),
+    IndoorRouteEdge(
+      from: 'aisle_east',
+      to: 'junction_c',
+      distanceMeters: 6,
+    ),
+    IndoorRouteEdge(
+      from: 'junction_c',
+      to: 'sector_6',
+      distanceMeters: 5,
+    ),
+    IndoorRouteEdge(
+      from: 'junction_c',
+      to: 'sector_7',
+      distanceMeters: 8,
+    ),
+  ];
+
+  final Map<String, IndoorRouteNode> _nodeById = {
+    for (final node in _nodes) node.id: node,
+  };
+
+  final Map<String, List<IndoorRouteEdge>> _adjacency = {};
+
+  IndoorRouteService() {
+    for (final node in _nodes) {
+      _adjacency[node.id] = [];
+    }
+
+    // Treat all sample aisle connections as bidirectional.
+    for (final edge in _edges) {
+      _adjacency[edge.from]!.add(edge);
+
+      _adjacency[edge.to]!.add(
+        IndoorRouteEdge(
+          from: edge.to,
+          to: edge.from,
+          distanceMeters: edge.distanceMeters,
+        ),
+      );
+    }
+  }
+
+  /// Calculates a shortest path from the selected starting point
+  /// to a predicted sector.
+  ///
+  /// The caller supplies the booked slot ID for the final instruction.
+  /// This sample assumes the booked slot is located in the target sector.
+  IndoorRouteResult calculateRoute({
+    required int destinationSector,
+    required String slotId,
+    String startNodeId = entranceId,
+  }) {
+    if (destinationSector < 1 || destinationSector > 7) {
+      throw ArgumentError.value(
+        destinationSector,
+        'destinationSector',
+        'Sector must be between 1 and 7.',
+      );
+    }
+
+    if (slotId.trim().isEmpty) {
+      throw ArgumentError.value(
+        slotId,
+        'slotId',
+        'A booked slot ID is required.',
+      );
+    }
+
+    if (!_nodeById.containsKey(startNodeId)) {
+      throw ArgumentError.value(
+        startNodeId,
+        'startNodeId',
+        'The starting point is not in the sample layout.',
+      );
+    }
+
+    final destinationId = 'sector_$destinationSector';
+
+    final distances = <String, double>{
+      for (final id in _nodeById.keys) id: double.infinity,
+    };
+
+    final previous = <String, String?>{
+      for (final id in _nodeById.keys) id: null,
+    };
+
+    final unvisited = _nodeById.keys.toSet();
+    distances[startNodeId] = 0;
+
+    while (unvisited.isNotEmpty) {
+      String? current;
+      var shortestDistance = double.infinity;
+
+      for (final candidate in unvisited) {
+        final distance = distances[candidate]!;
+
+        if (distance < shortestDistance) {
+          shortestDistance = distance;
+          current = candidate;
+        }
+      }
+
+      if (current == null || shortestDistance == double.infinity) {
+        break;
+      }
+
+      if (current == destinationId) {
+        break;
+      }
+
+      unvisited.remove(current);
+
+      for (final edge in _adjacency[current]!) {
+        if (!unvisited.contains(edge.to)) {
+          continue;
+        }
+
+        final candidateDistance =
+            distances[current]! + edge.distanceMeters;
+
+        if (candidateDistance < distances[edge.to]!) {
+          distances[edge.to] = candidateDistance;
+          previous[edge.to] = current;
+        }
+      }
+    }
+
+    if (distances[destinationId] == double.infinity) {
+      throw StateError(
+        'No route found to Sector $destinationSector.',
+      );
+    }
+
+    final reversedPath = <String>[];
+    String? current = destinationId;
+
+    while (current != null) {
+      reversedPath.add(current);
+      current = previous[current];
+    }
+
+    final routeIds = reversedPath.reversed.toList();
+
+    final routeNodes = routeIds
+        .map((id) => _nodeById[id]!)
+        .toList(growable: false);
+
+    final instructions = <String>[
+      'Start at ${routeNodes.first.label}.',
+    ];
+
+    for (var i = 1; i < routeNodes.length; i++) {
+      final node = routeNodes[i];
+
+      if (node.id.startsWith('sector_')) {
+        instructions.add(
+          'Enter ${node.label} and locate booked slot $slotId.',
+        );
+      } else {
+        instructions.add('Continue to ${node.label}.');
+      }
+    }
+
+    return IndoorRouteResult(
+      nodes: routeNodes,
+      totalDistanceMeters: distances[destinationId]!,
+      instructions: instructions,
+    );
+  }
+}
