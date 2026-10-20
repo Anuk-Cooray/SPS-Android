@@ -15,12 +15,14 @@ class BarrierApiException implements Exception {
 }
 
 class BarrierApiService implements BarrierService {
+  // Android emulator -> host computer.
+  // Use http://127.0.0.1:8000 for requests made on the host itself.
   final String baseUrl;
   final http.Client _client;
   final Duration timeout;
 
   BarrierApiService({
-    required this.baseUrl,
+    this.baseUrl = 'http://10.0.2.2:8000',
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
   }) : _client = client ?? http.Client();
@@ -83,6 +85,7 @@ class BarrierApiService implements BarrierService {
     }
   }
 
+  // QR barrier verification.
   @override
   Future<bool> verifyAndOpenBarrier({
     required String bookingId,
@@ -106,6 +109,7 @@ class BarrierApiService implements BarrierService {
         response['barrier_opened'] == true;
   }
 
+  // Walking directions.
   @override
   Future<Map<String, dynamic>> getWalkingDirectionsToCar({
     required String slotId,
@@ -123,6 +127,38 @@ class BarrierApiService implements BarrierService {
         'user_lat': userLat,
         'user_lng': userLng,
       },
+    );
+  }
+
+  // Find My Car: predict the first-floor sector from six BLE RSSI values.
+  Future<int> predictSector({
+    required double b1,
+    required double b2,
+    required double b3,
+    required double b4,
+    required double b5,
+    required double b6,
+  }) async {
+    final response = await _postJson(
+      '/api/navigation/predict-sector',
+      {
+        'B1': b1,
+        'B2': b2,
+        'B3': b3,
+        'B4': b4,
+        'B5': b5,
+        'B6': b6,
+      },
+    );
+
+    final prediction = response['predicted_sector'];
+
+    if (prediction is num) {
+      return prediction.toInt();
+    }
+
+    throw const BarrierApiException(
+      'The backend response did not contain a valid sector prediction.',
     );
   }
 
