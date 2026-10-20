@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'service_contract.dart';
+import 'service_contracts.dart';
 
 class BarrierApiException implements Exception {
   final String message;
