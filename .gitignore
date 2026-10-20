@@ -66,3 +66,6 @@ key.properties
 .env.*
 !.env.example
 
+
+# Local Firebase emulator data (scripts/start-emulators.ps1)
+/emulator-data/
