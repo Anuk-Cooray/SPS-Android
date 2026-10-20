@@ -63,6 +63,21 @@ flutter run
 
 The reservation authority in this system runs strictly on the server using **Firebase Cloud Functions (Node 20 / TypeScript)** and **Cloud Firestore atomic transactions** to guarantee race condition immunity and autonomous 15-minute hold auto-release even if mobile devices are disconnected or killed.
 
+### Quick start (free, no Blaze plan needed)
+Everything runs on your machine: Auth, Firestore and Cloud Functions in the emulators, and the dev app on an Android emulator. The login code is shown in the app instead of being emailed.
+
+```powershell
+# Terminal 1: start the emulators (Ctrl+C to stop; data is saved to .\emulator-data)
+.\scripts\start-emulators.ps1
+
+# Terminal 2, first run only: seed the parking lots
+.\scripts\seed-emulators.ps1
+
+# Terminal 2: start an Android emulator, then run the app against the local backend
+.\scripts\run-app.ps1 -Device emulator-5554
+```
+The scripts expect JDK 21 at `%USERPROFILE%\tools\jdk-21` and the standalone Firebase CLI at `%USERPROFILE%\tools\firebase.exe` (https://firebase.tools/bin/win/latest), falling back to `java` / `firebase` on PATH. Use `-Fresh` to start with empty data. Stop the emulators with Ctrl+C rather than closing the window, or the data is not saved.
+
 ### 1. Prerequisites
 * Node.js v20+ & npm
 * Java Runtime (JRE / JDK 11+) — *OpenJDK bundled with Android Studio in `Android Studio/jbr` can be used*

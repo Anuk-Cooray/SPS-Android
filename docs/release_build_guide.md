@@ -138,6 +138,8 @@ python -m eval.run_system_check
 
 ### 7. Deploying the Backend (Auth, Functions, Rules, Email)
 
+> Only needed for a real, internet-facing deployment, which requires the Blaze plan. For development and demos everything runs free on the local emulators; see **Quick start** in the README.
+
 Sign-in is a server-issued email code exchanged for a Firebase Auth custom token, so the backend must be live **before** the matching app build ships. Do every step on `sps-app-dev` first, test with a `dev` build, then repeat on `sps-app-c3f90`.
 
 Prerequisites: the project is on the **Blaze** plan (required for secrets and extensions), and the Firebase CLI is signed in (`firebase login`). On networks that block npm, use the standalone CLI from https://firebase.tools/bin/win/latest in place of `npx firebase-tools`.
