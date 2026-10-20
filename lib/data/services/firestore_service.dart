@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/admin_alert_model.dart';
 import '../models/booking_model.dart';
@@ -151,7 +152,13 @@ class FirestoreService {
       if (e is CloudFunctionsException && (e.code == 'unauthenticated' || e.code == 'permission-denied')) {
         rethrow;
       }
-      debugPrint('[FirestoreService] Server createBooking call failed ($e), executing local fallback');
+      // Outside demo mode never show a booking the server did not confirm
+      if (!AppConfig.kDemoMode) {
+        debugPrint('[FirestoreService] Server createBooking call failed ($e)');
+        if (e is CloudFunctionsException) rethrow;
+        throw CloudFunctionsException(code: 'unavailable', message: 'Booking server unreachable: $e');
+      }
+      debugPrint('[FirestoreService] Server createBooking call failed ($e), executing demo-mode local fallback');
       return _localFallbackBooking(
         lotId: lotId,
         slotId: slotId,

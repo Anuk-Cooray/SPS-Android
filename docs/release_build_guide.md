@@ -133,3 +133,51 @@ python -m eval.plot_results
 # 4. Replay 200 trips against Cloud Functions server authority (Parity <= 5%)
 python -m eval.run_system_check
 ```
+
+---
+
+### 7. Deploying the Backend (Auth, Functions, Rules, Email)
+
+Sign-in is a server-issued email code exchanged for a Firebase Auth custom token, so the backend must be live **before** the matching app build ships. Do every step on `sps-app-dev` first, test with a `dev` build, then repeat on `sps-app-c3f90`.
+
+Prerequisites: the project is on the **Blaze** plan (required for secrets and extensions), and the Firebase CLI is signed in (`firebase login`). On networks that block npm, use the standalone CLI from https://firebase.tools/bin/win/latest in place of `npx firebase-tools`.
+
+#### Step A: Enable Firebase Authentication
+In the Firebase console → **Authentication** → **Get started**. No sign-in provider needs to be enabled (custom tokens are always accepted).
+
+#### Step A2: Let the functions mint sign-in tokens
+`verifyEmailOtp` calls `createCustomToken`, which signs through IAM in deployed functions. In Google Cloud console → **IAM**, give the functions' runtime service account (`<PROJECT_NUMBER>-compute@developer.gserviceaccount.com` for 2nd-gen functions) the **Service Account Token Creator** role, and make sure the **IAM Service Account Credentials API** is enabled. Without this every login fails with `iam.serviceAccounts.signBlob` permission errors.
+
+#### Step B: Set the HMAC secret
+Generate a long random value (never the development value from `functions/.env`) and store it in Secret Manager; the CLI prompts for it:
+```bash
+firebase functions:secrets:set HMAC_SECRET_KEY --project sps-app-c3f90
+```
+
+#### Step C: Install the Trigger Email extension (OTP delivery)
+`requestEmailOtp` writes messages to the `/mail` collection; the extension sends them. Have SMTP credentials ready (for example a Gmail app password, SendGrid or Mailgun). The installer prompts for each parameter and stores the SMTP password as a secret:
+```bash
+firebase ext:install firebase/firestore-send-email --project sps-app-c3f90 --local
+```
+Answer the prompts with:
+| Parameter | Value |
+|---|---|
+| Firestore Instance Location | the region of your Firestore database |
+| SMTP connection URI | e.g. `smtps://username@smtp.gmail.com:465` (no password in the URI) |
+| SMTP password | your SMTP / app password |
+| Email documents collection | `mail` |
+| Default FROM address | e.g. `Smart Parking <no-reply@your-domain>` |
+
+`--local` records the extension in `firebase.json` and `extensions/` so it is deployed together with the functions in Step D.
+
+#### Step D: Deploy functions, rules and the extension
+```bash
+cd functions && npm ci && npm run build && cd ..
+firebase deploy --only functions,firestore:rules,extensions --project sps-app-c3f90
+```
+
+#### Step E: Smoke test before releasing the app
+Install a `prod` release build on a device, request a code for a real inbox and confirm it arrives within a minute (check the `delivery` field on the `/mail` document if it does not), then book and check in. Under a deployed backend the code is never shown in the app; it only arrives by email.
+
+#### Step F: Release the app
+Build the AAB from section 3B with `android/key.properties` in place (section 2). Without that file the release build is signed with the debug key and Google Play rejects it. Users on the previous app version are signed out once and must log in with an email code.

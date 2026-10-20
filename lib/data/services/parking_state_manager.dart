@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/reoptimization/engine/reoptimization_engine.dart';
 import '../../features/reoptimization/engine/scoring_weights.dart';
@@ -728,6 +729,12 @@ class ParkingStateManager extends ChangeNotifier {
           predictedEtaMinProvider: feasibility?.predictedEtaMinProvider,
           predictedEtaMinCorrected: feasibility?.predictedEtaMinCorrected,
           modelVersion: feasibility?.modelVersion ?? 'v1.0.0-linear',
+        );
+      } else if (!_isTestRuntime && !AppConfig.kDemoMode) {
+        // No backend available: outside demo mode never invent a booking
+        throw const CloudFunctionsException(
+          code: 'unavailable',
+          message: 'Booking server is not available.',
         );
       } else {
         final holdExpiry = arrivalTime.add(const Duration(minutes: 15));
