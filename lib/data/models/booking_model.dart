@@ -164,6 +164,15 @@ class Booking {
     return overtimeHours > 0 ? estimatedFee + overtimeHours * hourlyRate : estimatedFee;
   }
 
+  /// Hold ran out without a check-in. The server auto-releases these; until its sweep
+  /// runs (it never does on the local emulators) treat them as finished.
+  bool get isLapsed =>
+      checkedInAt == null &&
+      (status == BookingStatus.reserved ||
+          status == BookingStatus.upgraded ||
+          status == BookingStatus.extended) &&
+      isHoldExpired;
+
   bool get isActive =>
       status == BookingStatus.reserved ||
       status == BookingStatus.upgraded ||

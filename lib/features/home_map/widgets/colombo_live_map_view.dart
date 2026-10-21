@@ -215,70 +215,79 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                     .map((lot) {
                   final isSelected = lot.id == widget.selectedLotId;
                   final isFull = lot.isFull;
+                  // Foreground per badge fill: white on the accent, muted on "full", onPrimary otherwise
+                  final labelColor =
+                      isSelected ? Colors.white : (isFull ? c.textSecondary : c.onPrimary);
 
                   return Marker(
                     point: LatLng(lot.latitude, lot.longitude),
                     width: 84,
                     height: 52,
-                    child: GestureDetector(
-                      onTap: () => widget.onLotSelected(lot),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? c.accent
-                                  : (isFull ? c.slotTaken : c.primary),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isSelected ? Colors.white : Colors.transparent,
-                                width: 1.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.25),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                )
-                              ],
-                            ),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'P',
-                                    style: AppText.caption.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    isFull ? 'Full' : '${lot.freeSlots}',
-                                    style: AppText.caption.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 11,
-                                    ),
-                                  ),
+                    child: Semantics(
+                      button: true,
+                      selected: isSelected,
+                      label: '${lot.name}, ${isFull ? 'full' : '${lot.freeSlots} free'}',
+                      excludeSemantics: true,
+                      child: GestureDetector(
+                        onTap: () => widget.onLotSelected(lot),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? c.accent
+                                    : (isFull ? c.slotTaken : c.primary),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSelected ? Colors.white : Colors.transparent,
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.25),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  )
                                 ],
                               ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'P',
+                                      style: AppText.caption.copyWith(
+                                        color: labelColor,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      isFull ? 'Full' : '${lot.freeSlots}',
+                                      style: AppText.caption.copyWith(
+                                        color: labelColor,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: isSelected ? c.accent : c.primary,
-                              shape: BoxShape.circle,
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: isSelected ? c.accent : c.primary,
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );

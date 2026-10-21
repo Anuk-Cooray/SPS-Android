@@ -442,7 +442,9 @@ abstract final class AppTheme {
       ),
 
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.all(Colors.white),
+        // On: thumb contrasts with the primary track (white in light, black in dark)
+        thumbColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? c.onPrimary : Colors.white),
         trackColor: WidgetStateProperty.resolveWith((s) =>
             s.contains(WidgetState.selected) ? c.primary : c.border),
         trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
