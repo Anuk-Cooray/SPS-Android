@@ -7,11 +7,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_parking/core/theme/app_theme.dart';
 import 'package:smart_parking/data/models/booking_model.dart';
 import 'package:smart_parking/data/models/vehicle_model.dart';
 import 'package:smart_parking/data/services/cloud_functions_client.dart';
 import 'package:smart_parking/data/services/firestore_service.dart';
+import 'package:smart_parking/data/services/parking_state_manager.dart';
 import 'package:smart_parking/features/barrier_checkin/parked_screen.dart';
 
 Booking _booking({DateTime? checkedInAt}) {
@@ -97,16 +100,31 @@ void main() {
     expect(DateTime.parse(sent).isAtSameMomentAs(localArrival), isTrue);
   });
 
+  group('Booking.parkingFeeFor', () {
+    test('charges the booked fee within the booked duration and hourly beyond it', () {
+      final b = _booking(); // 2 h for LKR 200 -> LKR 100/h
+      expect(b.parkingFeeFor(const Duration(minutes: 10)), 200);
+      expect(b.parkingFeeFor(const Duration(hours: 2)), 200);
+      expect(b.parkingFeeFor(const Duration(hours: 2, minutes: 1)), 300);
+      expect(b.parkingFeeFor(const Duration(hours: 4, minutes: 30)), 500);
+    });
+  });
+
   group('ParkedScreen', () {
     Future<void> pump(WidgetTester tester, Booking booking) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 2.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.light,
-        home: ParkedScreen(booking: booking, onExitParking: () {}),
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(ChangeNotifierProvider(
+        create: (_) => ParkingStateManager(),
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: ParkedScreen(booking: booking, onExitParking: () {}),
+        ),
       ));
+      await tester.pump();
     }
 
     testWidgets('shows the real check-in time, elapsed time and fee', (tester) async {
@@ -115,14 +133,16 @@ void main() {
 
       expect(find.text(DateFormat('HH:mm').format(checkedInAt)), findsOneWidget);
       expect(find.text('1:15'), findsOneWidget);
-      // 2 h for LKR 200 -> LKR 100/h, 1h15m billed as 2 started hours
+      // 1h15m of a 2 h booking is within the booked time: the booked LKR 200
       expect(find.text('LKR 200'), findsOneWidget);
+      // Walking distance comes from the slot data, not a fixed string
+      expect(find.textContaining('m from the entrance'), findsOneWidget);
     });
 
     testWidgets('falls back to now when the booking predates check-in', (tester) async {
       await pump(tester, _booking());
       expect(find.text('0:00'), findsOneWidget);
-      expect(find.text('LKR 100'), findsOneWidget);
+      expect(find.text('LKR 200'), findsOneWidget);
       expect(find.text(DateFormat('HH:mm').format(DateTime.now())), findsOneWidget);
     });
   });
