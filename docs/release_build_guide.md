@@ -82,14 +82,12 @@ flutter build apk --flavor dev \
 
 ---
 
-### 4. Grayscale Map Tiles & CARTO Licensing Compliance
+### 4. Grayscale Map Tiles & OpenStreetMap Licensing
 
-The Colombo live route and bay navigation interface uses **CARTO Positron** grayscale raster tiles to match the system's monochrome + blue accent design language:
-- **Endpoint**: `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png`
-- **Subdomains**: `['a', 'b', 'c', 'd']`
-- **Attribution**: Displayed on all map instances in accordance with CARTO and OpenStreetMap copyright guidelines:
-  `© OpenStreetMap contributors, © CARTO`
-- **Terms of Service**: Non-commercial academic research and demonstration usage under CARTO Free Tier and OpenStreetMap ODbL.
+The Colombo live route map uses **OpenStreetMap standard tiles**, turned grayscale (inverted in dark mode) with a colour matrix in `colombo_live_map_view.dart` to match the monochrome + blue accent design language. CARTO basemaps were used previously but now require an API key and return placeholder tiles without one.
+- **Endpoint**: `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, sent with the app's package name as user agent
+- **Attribution**: `© OpenStreetMap contributors` is shown on the map, as the tile usage policy requires
+- **Usage policy**: https://operations.osmfoundation.org/policies/tiles/ — fine for development, demos and light use; a public release with many users should switch to a commercial or self-hosted tile provider
 
 ---
 

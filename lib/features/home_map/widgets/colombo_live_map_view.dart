@@ -88,10 +88,11 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final routePoints = _generateRoutePoints();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Stack(
       children: [
-        // 1. Live FlutterMap with OpenStreetMap / Carto tiles
+        // 1. Live FlutterMap with OpenStreetMap tiles, filtered to the monochrome palette
         FlutterMap(
           mapController: _mapController,
           options: MapOptions(
@@ -104,12 +105,16 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
             maxZoom: 18.0,
           ),
           children: [
-            // CARTO Positron Grayscale Tile Layer (Design System Conforming)
+            // OpenStreetMap standard tiles (no API key); CARTO basemaps now require a key.
+            // A colour matrix turns them grayscale (inverted in dark mode) to match the theme.
             TileLayer(
-              urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.sliit.smartparking.smart_parking',
               maxZoom: 19,
+              tileBuilder: (context, tileWidget, tile) => ColorFiltered(
+                colorFilter: isDark ? _mapTilesDark : _mapTilesLight,
+                child: tileWidget,
+              ),
             ),
 
             // Route Polyline Layer
@@ -365,7 +370,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
           ),
         ),
 
-        // 3. Map Tile Attribution (OpenStreetMap & CARTO License Compliance)
+        // 3. Map Tile Attribution (required by the OpenStreetMap tile usage policy)
         Positioned(
           left: AppSpace.sm,
           bottom: AppSpace.xs,
@@ -376,7 +381,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
               borderRadius: BorderRadius.circular(4),
             ),
             child: const Text(
-              '© OpenStreetMap contributors, © CARTO',
+              '© OpenStreetMap contributors',
               style: TextStyle(
                 color: Colors.white70,
                 fontSize: 11,
@@ -389,3 +394,19 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
     );
   }
 }
+
+// Luminance grayscale (light theme).
+const _mapTilesLight = ColorFilter.matrix(<double>[
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0, 0, 0, 1, 0,
+]);
+
+// Inverted, compressed grayscale (dark theme): land ~#1F, labels stay light.
+const _mapTilesDark = ColorFilter.matrix(<double>[
+  -0.1913, -0.6437, -0.0650, 0, 247.5,
+  -0.1913, -0.6437, -0.0650, 0, 247.5,
+  -0.1913, -0.6437, -0.0650, 0, 247.5,
+  0, 0, 0, 1, 0,
+]);
