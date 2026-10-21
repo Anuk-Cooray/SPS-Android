@@ -127,7 +127,7 @@ class ActiveBookingMiniBanner extends StatelessWidget {
                               'Bay ${booking.slotId}',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 10,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),

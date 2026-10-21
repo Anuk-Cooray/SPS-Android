@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/models/parking_lot_model.dart';
 import '../../data/models/parking_slot_model.dart';
@@ -362,35 +363,25 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
           _selectedSlot = nextBest;
         });
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            nextBest != null
-                ? "Slot just taken — here's the next best: ${nextBest.id}"
-                : "Slot just taken — please choose another available bay.",
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          backgroundColor: const Color(0xFFD97706), // Amber warning
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-        ),
+      showAppSnack(
+        context,
+        nextBest != null
+            ? "Slot just taken — here's the next best: ${nextBest.id}"
+            : 'Slot just taken — please choose another available bay.',
+        tone: SnackTone.warning,
+        duration: const Duration(seconds: 4),
       );
     } catch (e) {
       if (!mounted) return;
       final signedOut = e is CloudFunctionsException &&
           (e.code == 'unauthenticated' || e.code == 'permission-denied');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            signedOut
-                ? 'Your session has expired. Please sign in again to book.'
-                : "Couldn't confirm your booking with the server. Check your connection and try again.",
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          backgroundColor: const Color(0xFFDC2626), // Red error
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-        ),
+      showAppSnack(
+        context,
+        signedOut
+            ? 'Your session has expired. Please sign in again to book.'
+            : "Couldn't confirm your booking with the server. Check your connection and try again.",
+        tone: SnackTone.error,
+        duration: const Duration(seconds: 4),
       );
     }
   }
@@ -716,7 +707,7 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                                 Expanded(
                                   child: Text(
                                     'Custom pick: ${_selectedSlot.id} (${_selectedSlot.walkingDistanceMeters}m, score: ${_selectedScore?.totalScore.toStringAsFixed(1) ?? "--"}). Recommended ${_recommendedSlot.id} saves ${(_selectedSlot.walkingDistanceMeters - _recommendedSlot.walkingDistanceMeters).clamp(0, 500)}m.',
-                                    style: AppText.caption.copyWith(color: c.textPrimary, fontSize: 11),
+                                    style: AppText.caption.copyWith(color: c.textPrimary),
                                   ),
                                 ),
                                 InkWell(
@@ -977,7 +968,7 @@ class _LegendItem extends StatelessWidget {
         const SizedBox(width: AppSpace.xxs),
         Text(
           label,
-          style: AppText.caption.copyWith(color: c.textSecondary, fontSize: 11),
+          style: AppText.caption.copyWith(color: c.textSecondary),
         ),
       ],
     );

@@ -310,7 +310,7 @@ class _LotCard extends StatelessWidget {
                             'Selected',
                             style: AppText.caption.copyWith(
                               color: c.accent,
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

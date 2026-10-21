@@ -71,8 +71,8 @@ class AppColors extends ThemeExtension<AppColors> {
     border: Color(0xFFE4E4E7),
     divider: Color(0xFFF0F0F2),
     textPrimary: Color(0xFF0A0A0A),
-    textSecondary: Color(0xFF71717A),
-    textTertiary: Color(0xFFA1A1AA),
+    textSecondary: Color(0xFF66666F), // 5.7:1 on white, 5.2:1 on surfaceMuted
+    textTertiary: Color(0xFF6E6E77), // 5.0:1 on white, 4.6:1 on surfaceMuted
     primary: Color(0xFF0A0A0A),
     onPrimary: Color(0xFFFFFFFF),
     accent: Color(0xFF2563EB),
@@ -81,7 +81,7 @@ class AppColors extends ThemeExtension<AppColors> {
     warningSoft: Color(0xFFFFFBEB),
     warningBorder: Color(0xFFFDE68A),
     danger: Color(0xFFDC2626),
-    slotFreeBorder: Color(0xFFA1A1AA),
+    slotFreeBorder: Color(0xFF85858D), // 3.7:1 — free slots must read as controls
     slotTaken: Color(0xFFD4D4D8),
     slotBlocked: Color(0xFFE4E4E7),
     mapLand: Color(0xFFEEEEF0),
@@ -98,7 +98,7 @@ class AppColors extends ThemeExtension<AppColors> {
     divider: Color(0xFF1F1F23),
     textPrimary: Color(0xFFFAFAFA),
     textSecondary: Color(0xFFA1A1AA),
-    textTertiary: Color(0xFF71717A),
+    textTertiary: Color(0xFF8E8E98), // 5.6:1 on surface
     primary: Color(0xFFFAFAFA),
     onPrimary: Color(0xFF0A0A0A),
     accent: Color(0xFF3B82F6),
@@ -107,7 +107,7 @@ class AppColors extends ThemeExtension<AppColors> {
     warningSoft: Color(0xFF2A1F0A),
     warningBorder: Color(0xFF5C4310),
     danger: Color(0xFFF87171),
-    slotFreeBorder: Color(0xFF52525B),
+    slotFreeBorder: Color(0xFF7A7A84), // 4.3:1 on surface
     slotTaken: Color(0xFF3F3F46),
     slotBlocked: Color(0xFF27272A),
     mapLand: Color(0xFF111113),
@@ -234,7 +234,14 @@ abstract final class AppRadius {
 abstract final class AppSize {
   static const double buttonHeight = 56;
   static const double inputHeight = 56;
-  static const double iconButton = 44; // min touch target
+  static const double iconButton = 48; // min touch target (Android 48dp)
+}
+
+/// Icon sizes: inline with caption text, standard UI icon, prominent/hero icon.
+abstract final class AppIconSize {
+  static const double sm = 16;
+  static const double md = 20;
+  static const double lg = 24;
 }
 
 abstract final class AppMotion {

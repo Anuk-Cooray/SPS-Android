@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_snackbar.dart';
 import '../../../core/utils/google_maps_launcher.dart';
 import '../../../data/models/booking_model.dart';
 import '../../../data/models/parking_lot_model.dart';
@@ -68,12 +69,7 @@ class BookingConfirmedDialog extends StatelessWidget {
     );
 
     if (!success && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Opening Google Maps web directions...'),
-          backgroundColor: Colors.black87,
-        ),
-      );
+      showAppSnack(context, 'Opening Google Maps web directions...');
     }
   }
 
@@ -230,7 +226,7 @@ class BookingConfirmedDialog extends StatelessWidget {
                           '15m window starts upon arrival',
                           style: AppText.caption.copyWith(
                             color: c.accent,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -258,7 +254,7 @@ class BookingConfirmedDialog extends StatelessWidget {
               'CHOOSE NAVIGATION MODE',
               style: AppText.caption.copyWith(
                 color: c.textSecondary,
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.8,
               ),
