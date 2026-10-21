@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../data/services/email_otp_auth.dart';
 import '../../data/services/parking_state_manager.dart';
 
@@ -232,13 +233,40 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: c.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: _step == 0 ? _buildEmailStep(c) : _buildOtpStep(c),
+      body: Stack(
+        children: [
+          // Navy backdrop with two soft glows (blue top-right, teal bottom-left)
+          const Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: AppEffects.backdrop))),
+          Positioned(top: -120, right: -80, child: _glowOrb(c.accent, 320)),
+          Positioned(bottom: -140, left: -100, child: _glowOrb(c.success, 300)),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                // Phone-width column, centred on tablets
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: _step == 0 ? _buildEmailStep(c) : _buildOtpStep(c),
+                  ),
+                ),
+              ),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _glowOrb(Color color, double size) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color.withValues(alpha: 0.28), color.withValues(alpha: 0)]),
         ),
       ),
     );
@@ -259,8 +287,9 @@ class _LoginScreenState extends State<LoginScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: c.primary,
+                gradient: AppEffects.hero,
                 borderRadius: BorderRadius.circular(14),
+                boxShadow: AppEffects.glow(c.accent, strength: 0.5),
               ),
               alignment: Alignment.center,
               child: Text(
@@ -279,9 +308,10 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: AppSpace.xl),
 
         // Title & Description
-        Text(
-          'Park smarter.\nBook in seconds.',
-          style: AppText.h1.copyWith(color: c.textPrimary),
+        Text('Park smarter.', style: AppText.h1.copyWith(color: c.textPrimary, fontSize: 32)),
+        ShaderMask(
+          shaderCallback: (bounds) => LinearGradient(colors: [c.accent, c.success]).createShader(bounds),
+          child: Text('Book in seconds.', style: AppText.h1.copyWith(color: Colors.white, fontSize: 32)),
         ),
 
         const SizedBox(height: AppSpace.xs),
@@ -293,90 +323,98 @@ class _LoginScreenState extends State<LoginScreen> {
 
         const SizedBox(height: AppSpace.xl),
 
-        // Preset quick chips for convenient campus testing
-        if (AppConfig.kDemoMode) ...[
-          Text('DEMO ACCOUNTS', style: AppText.overline.copyWith(color: c.textSecondary)),
-          const SizedBox(height: AppSpace.xs),
-          Wrap(
-            spacing: AppSpace.xs,
-            runSpacing: AppSpace.xs,
+        GlassCard(
+          padding: const EdgeInsets.all(AppSpace.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ActionChip(
-                avatar: const Icon(Icons.account_circle_outlined, size: 16),
-                label: const Text('anuk@example.com'),
-                onPressed: () => _selectPresetEmail('anuk@example.com'),
+            // Preset quick chips for convenient campus testing
+            if (AppConfig.kDemoMode) ...[
+              Text('DEMO ACCOUNTS', style: AppText.overline.copyWith(color: c.textSecondary)),
+              const SizedBox(height: AppSpace.xs),
+              Wrap(
+                spacing: AppSpace.xs,
+                runSpacing: AppSpace.xs,
+                children: [
+                  ActionChip(
+                    avatar: const Icon(Icons.account_circle_outlined, size: 16),
+                    label: const Text('anuk@example.com'),
+                    onPressed: () => _selectPresetEmail('anuk@example.com'),
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.school_outlined, size: 16),
+                    label: const Text('driver@sliit.lk'),
+                    onPressed: () => _selectPresetEmail('driver@sliit.lk'),
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                    label: const Text('New driver'),
+                    tooltip: 'Fills newdriver@sliit.lk, an account with no vehicle yet',
+                    onPressed: () => _selectPresetEmail('newdriver@sliit.lk'),
+                  ),
+                ],
               ),
-              ActionChip(
-                avatar: const Icon(Icons.school_outlined, size: 16),
-                label: const Text('driver@sliit.lk'),
-                onPressed: () => _selectPresetEmail('driver@sliit.lk'),
-              ),
-              ActionChip(
-                avatar: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-                label: const Text('New driver'),
-                tooltip: 'Fills newdriver@sliit.lk, an account with no vehicle yet',
-                onPressed: () => _selectPresetEmail('newdriver@sliit.lk'),
-              ),
+              const SizedBox(height: AppSpace.xl),
             ],
-          ),
-          const SizedBox(height: AppSpace.xl),
-        ],
 
-        // Email Field
-        Text('Campus Email Address', style: AppText.label.copyWith(color: c.textSecondary)),
-        const SizedBox(height: AppSpace.xs),
-        TextField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.done,
-          autocorrect: false,
-          enableSuggestions: false,
-          autofillHints: const [AutofillHints.email],
-          style: AppText.body.copyWith(
-            color: c.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-          decoration: InputDecoration(
-            prefixIcon: Icon(
-              Icons.mail_outline_rounded,
-              color: c.textSecondary,
-              size: 20,
+            // Email Field
+            Text('Campus Email Address', style: AppText.label.copyWith(color: c.textSecondary)),
+            const SizedBox(height: AppSpace.xs),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.email],
+              style: AppText.body.copyWith(
+                color: c.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.mail_outline_rounded,
+                  color: c.textSecondary,
+                  size: 20,
+                ),
+                hintText: 'name@sliit.lk',
+                errorText: _emailError,
+              ),
+              onChanged: (_) {
+                if (_emailError != null) setState(() => _emailError = null);
+              },
+              onSubmitted: (_) => _handleSendCode(),
             ),
-            hintText: 'name@sliit.lk',
-            errorText: _emailError,
-          ),
-          onChanged: (_) {
-            if (_emailError != null) setState(() => _emailError = null);
-          },
-          onSubmitted: (_) => _handleSendCode(),
-        ),
 
-        const SizedBox(height: AppSpace.xxl),
+            const SizedBox(height: AppSpace.xxl),
 
-        // Send Code Action Button
-        PrimaryButton(
-          text: 'Send Verification Code',
-          icon: Icons.arrow_forward_rounded,
-          isLoading: _isSending,
-          onPressed: _handleSendCode,
-        ),
-
-        const SizedBox(height: AppSpace.md),
-
-        // Terms Footnote
-        Center(
-          child: Text.rich(
-            TextSpan(
-              text: 'By continuing you agree to the ',
-              style: AppText.caption.copyWith(color: c.textSecondary),
-              children: [
-                // Plain text until Terms / Privacy pages exist; underlined text implies a link
-                TextSpan(text: 'Terms', style: TextStyle(color: c.textPrimary)),
-                const TextSpan(text: ' and '),
-                TextSpan(text: 'Privacy Policy', style: TextStyle(color: c.textPrimary)),
-                const TextSpan(text: '.'),
-              ],
+            // Send Code Action Button
+            PrimaryButton(
+              text: 'Send Verification Code',
+              icon: Icons.arrow_forward_rounded,
+              isLoading: _isSending,
+              onPressed: _handleSendCode,
             ),
+
+            const SizedBox(height: AppSpace.md),
+
+            // Terms Footnote
+            Center(
+              child: Text.rich(
+                TextSpan(
+                  text: 'By continuing you agree to the ',
+                  style: AppText.caption.copyWith(color: c.textSecondary),
+                  children: [
+                    // Plain text until Terms / Privacy pages exist; underlined text implies a link
+                    TextSpan(text: 'Terms', style: TextStyle(color: c.textPrimary)),
+                    const TextSpan(text: ' and '),
+                    TextSpan(text: 'Privacy Policy', style: TextStyle(color: c.textPrimary)),
+                    const TextSpan(text: '.'),
+                  ],
+                ),
+              ),
+            ),
+            ],
           ),
         ),
 

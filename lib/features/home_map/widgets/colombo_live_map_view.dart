@@ -16,6 +16,12 @@ class ColomboLiveMapView extends StatefulWidget {
   final ValueChanged<ParkingLot> onLotSelected;
   final VoidCallback onRecenter;
 
+  /// Space kept clear of overlays when framing the lots (phone: card on top, sheet below).
+  final EdgeInsets fitPadding;
+
+  /// Distance of the zoom/recenter controls from the top.
+  final double controlsTop;
+
   const ColomboLiveMapView({
     super.key,
     required this.pickup,
@@ -24,6 +30,8 @@ class ColomboLiveMapView extends StatefulWidget {
     required this.selectedLotId,
     required this.onLotSelected,
     required this.onRecenter,
+    this.fitPadding = const EdgeInsets.fromLTRB(56, 230, 80, 440),
+    this.controlsTop = 212,
   });
 
   @override
@@ -49,7 +57,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
           LatLng(widget.destination.latitude, widget.destination.longitude),
           ...widget.activeLots.map((lot) => LatLng(lot.latitude, lot.longitude)),
         ],
-        padding: const EdgeInsets.fromLTRB(56, 230, 80, 440),
+        padding: widget.fitPadding,
         maxZoom: 17.5,
       );
 
@@ -115,13 +123,13 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
           children: [
             // OpenStreetMap standard tiles (no API key); CARTO basemaps now require a key.
             // A colour matrix turns them grayscale (inverted in dark mode) to match the theme.
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.sliit.smartparking.smart_parking',
-              maxZoom: 19,
-              tileBuilder: (context, tileWidget, tile) => ColorFiltered(
-                colorFilter: isDark ? _mapTilesDark : _mapTilesLight,
-                child: tileWidget,
+            // One filter over the whole tile layer (per-tile filters leave seams at tile edges)
+            ColorFiltered(
+              colorFilter: isDark ? _mapTilesDark : _mapTilesLight,
+              child: TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.sliit.smartparking.smart_parking',
+                maxZoom: 19,
               ),
             ),
 
@@ -169,7 +177,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                         child: Text(
                           'START',
                           style: AppText.caption.copyWith(
-                            color: Colors.white,
+                            color: c.onAccent,
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                           ),
@@ -217,7 +225,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                   final isFull = lot.isFull;
                   // Foreground per badge fill: white on the accent, muted on "full", onPrimary otherwise
                   final labelColor =
-                      isSelected ? Colors.white : (isFull ? c.textSecondary : c.onPrimary);
+                      isSelected ? c.onAccent : (isFull ? c.textSecondary : c.onPrimary);
 
                   return Marker(
                     point: LatLng(lot.latitude, lot.longitude),
@@ -300,7 +308,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
         // 2. Map Floating Quick Actions (Right side)
         Positioned(
           right: AppSpace.md,
-          top: 212, // below the location card
+          top: widget.controlsTop, // below the location card on phones
           child: Column(
             children: [
               // Recenter Destination
@@ -367,7 +375,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
 
         // 3. Map Tile Attribution (required by the OpenStreetMap tile usage policy)
         Positioned(
-          left: AppSpace.sm,
+          right: AppSpace.sm,
           bottom: AppSpace.xs,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -398,10 +406,10 @@ const _mapTilesLight = ColorFilter.matrix(<double>[
   0, 0, 0, 1, 0,
 ]);
 
-// Inverted, compressed grayscale (dark theme): land ~#1F, labels stay light.
+// Inverted grayscale tinted navy (dark premium theme): land ~#0C1325, labels pale blue.
 const _mapTilesDark = ColorFilter.matrix(<double>[
-  -0.1913, -0.6437, -0.0650, 0, 247.5,
-  -0.1913, -0.6437, -0.0650, 0, 247.5,
-  -0.1913, -0.6437, -0.0650, 0, 247.5,
+  -0.0765, -0.2575, -0.026, 0, 99.0,
+  -0.1186, -0.3991, -0.0403, 0, 153.4,
+  -0.1817, -0.6115, -0.0617, 0, 245.1,
   0, 0, 0, 1, 0,
 ]);

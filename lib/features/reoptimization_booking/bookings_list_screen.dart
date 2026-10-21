@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/hold_countdown_timer_widget.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/services/parking_state_manager.dart';
@@ -225,11 +226,7 @@ class _ActiveBookingCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpace.md),
         padding: const EdgeInsets.all(AppSpace.lg),
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          border: Border.all(color: c.border),
-        ),
+        decoration: glassDecoration(c),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -374,11 +371,7 @@ class _SimpleBookingCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpace.sm),
         padding: const EdgeInsets.all(AppSpace.md),
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          border: Border.all(color: c.border),
-        ),
+        decoration: glassDecoration(c),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [

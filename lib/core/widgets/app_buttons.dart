@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../theme/app_theme.dart';
 
 class PrimaryButton extends StatelessWidget {
@@ -18,47 +19,61 @@ class PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return SizedBox(
-      height: AppSize.buttonHeight,
-      width: double.infinity,
-      child: FilledButton(
-        onPressed: isLoading ? null : onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: c.primary,
-          foregroundColor: c.onPrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.button),
-          ),
-          elevation: 0,
+    final enabled = !isLoading && onPressed != null;
+    final radius = BorderRadius.circular(AppRadius.button);
+    // Glowing gradient button; dims when disabled or loading
+    return AnimatedOpacity(
+      duration: AppMotion.fast,
+      opacity: enabled || isLoading ? 1 : 0.5,
+      child: Container(
+        height: AppSize.buttonHeight,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: AppEffects.primaryGradient,
+          borderRadius: radius,
+          boxShadow: enabled ? AppEffects.glow(c.primary) : null,
         ),
-        child: isLoading
-            ? SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: c.onPrimary,
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 20),
-                    const SizedBox(width: AppSpace.xs),
-                  ],
-                  Flexible(
-                    child: Text(
-                      text,
-                      style: AppText.button.copyWith(color: c.onPrimary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
+        child: Material(
+          color: Colors.transparent,
+          child: Semantics(
+            button: true,
+            enabled: enabled,
+            child: InkWell(
+              onTap: enabled ? onPressed : null,
+              borderRadius: radius,
+              child: Center(
+                child: isLoading
+                    ? SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.2, color: c.onPrimary),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (icon != null) ...[
+                              Icon(icon, size: 20, color: c.onPrimary),
+                              const SizedBox(width: AppSpace.xs),
+                            ],
+                            Flexible(
+                              child: Text(
+                                text,
+                                style: AppText.button.copyWith(color: c.onPrimary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -69,12 +84,7 @@ class SecondaryButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData? icon;
 
-  const SecondaryButton({
-    super.key,
-    required this.text,
-    this.onPressed,
-    this.icon,
-  });
+  const SecondaryButton({super.key, required this.text, this.onPressed, this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -87,18 +97,13 @@ class SecondaryButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: c.textPrimary,
           side: BorderSide(color: c.border, width: 1.2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.button),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
-              Icon(icon, size: 18),
-              const SizedBox(width: AppSpace.xs),
-            ],
+            if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: AppSpace.xs)],
             Flexible(
               child: Text(
                 text,
@@ -120,12 +125,7 @@ class TertiaryButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final Color? color;
 
-  const TertiaryButton({
-    super.key,
-    required this.text,
-    this.onPressed,
-    this.color,
-  });
+  const TertiaryButton({super.key, required this.text, this.onPressed, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -138,10 +138,7 @@ class TertiaryButton extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: AppText.button.copyWith(
-          fontSize: 15,
-          color: color ?? c.textSecondary,
-        ),
+        style: AppText.button.copyWith(fontSize: 15, color: color ?? c.textSecondary),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../core/utils/google_maps_launcher.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../core/widgets/app_snackbar.dart';
@@ -172,8 +173,9 @@ class _ParkedScreenState extends State<ParkedScreen> {
                 child: CustomPaint(
                   painter: _CircularTimerPainter(
                     progress: progress,
-                    trackColor: c.divider,
-                    fillColor: c.primary,
+                    trackColor: c.surfaceMuted,
+                    fillColor: c.accent,
+                    endColor: c.success,
                   ),
                   child: Center(
                     child: Column(
@@ -207,11 +209,7 @@ class _ParkedScreenState extends State<ParkedScreen> {
 
               // 3-Column Stats Card
               Container(
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: c.border),
-                ),
+                decoration: glassDecoration(c),
                 child: IntrinsicHeight(
                   child: Row(
                     children: [
@@ -288,11 +286,7 @@ class _ParkedScreenState extends State<ParkedScreen> {
 
               // Find My Car Card
               Container(
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: c.border),
-                ),
+                decoration: glassDecoration(c),
                 child: Column(
                   children: [
                     // Mini Schematic Map
@@ -378,11 +372,13 @@ class _CircularTimerPainter extends CustomPainter {
   final double progress;
   final Color trackColor;
   final Color fillColor;
+  final Color endColor;
 
   _CircularTimerPainter({
     required this.progress,
     required this.trackColor,
     required this.fillColor,
+    required this.endColor,
   });
 
   @override
@@ -397,21 +393,31 @@ class _CircularTimerPainter extends CustomPainter {
       ..strokeWidth = 10;
     canvas.drawCircle(center, radius, trackPaint);
 
-    // Active progress arc
+    // Active progress arc: blue -> teal sweep with a soft glow underneath
+    final sweepAngle = 2 * pi * progress;
+    if (sweepAngle <= 0) return;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final shader = SweepGradient(
+      startAngle: 0,
+      endAngle: 2 * pi,
+      colors: [fillColor, endColor, fillColor],
+      transform: const GradientRotation(-pi / 2),
+    ).createShader(rect);
+
+    final glowPaint = Paint()
+      ..shader = shader
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 18
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    canvas.drawArc(rect, -pi / 2, sweepAngle, false, glowPaint..color = fillColor.withValues(alpha: 0.5));
+
     final fillPaint = Paint()
-      ..color = fillColor
+      ..shader = shader
       ..style = PaintingStyle.stroke
       ..strokeWidth = 10
       ..strokeCap = StrokeCap.round;
-
-    final sweepAngle = 2 * pi * progress;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -pi / 2,
-      sweepAngle,
-      false,
-      fillPaint,
-    );
+    canvas.drawArc(rect, -pi / 2, sweepAngle, false, fillPaint);
   }
 
   @override

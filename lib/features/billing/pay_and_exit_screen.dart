@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/services/parking_state_manager.dart';
@@ -113,11 +114,7 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
               // Invoice itemized card
               Container(
                 padding: const EdgeInsets.all(AppSpace.lg),
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: c.border),
-                ),
+                decoration: glassDecoration(c),
                 child: Column(
                   children: [
                     _buildInvoiceRow('Parking · ${_formatStay(stay)}', 'LKR $baseFee'),
