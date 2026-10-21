@@ -36,13 +36,17 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final booking = widget.booking;
-    final parkedFrom = (booking.checkedInAt ?? booking.arrivalTime).toLocal();
+    final state = context.watch<ParkingStateManager>();
+    // The booking handed to this screen can predate check-in; prefer the latest copy
+    final booking = state.bookings.firstWhere((b) => b.id == widget.booking.id, orElse: () => widget.booking);
+    final checkedIn = booking.checkedInAt?.toLocal();
+    final arrival = booking.arrivalTime.toLocal();
+    final parkedFrom = checkedIn ?? (arrival.isBefore(_exitAt) ? arrival : _exitAt);
     final stay = _exitAt.isAfter(parkedFrom) ? _exitAt.difference(parkedFrom) : Duration.zero;
     final baseFee = booking.parkingFeeFor(stay);
     final extFee = booking.extensionFee;
     final totalDue = baseFee + extFee;
-    final card = context.watch<ParkingStateManager>().currentUser.defaultPaymentMethod;
+    final card = state.currentUser.defaultPaymentMethod;
     final hasCard = card != null && card.isNotEmpty;
     final method = hasCard ? _selectedPaymentMethod : 1;
     final timeFmt = DateFormat('h:mm a');

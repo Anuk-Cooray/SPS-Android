@@ -35,8 +35,14 @@ class _ParkedScreenState extends State<ParkedScreen> {
   @override
   void initState() {
     super.initState();
-    // The booking handed over may predate check-in; the screen opens at check-in
-    _parkedAt = booking.checkedInAt?.toLocal() ?? DateTime.now();
+    // The booking handed over may predate check-in; prefer the latest copy, else the
+    // screen opens at check-in
+    final latest = context
+        .read<ParkingStateManager>()
+        .bookings
+        .where((b) => b.id == booking.id)
+        .firstOrNull;
+    _parkedAt = (latest?.checkedInAt ?? booking.checkedInAt)?.toLocal() ?? DateTime.now();
     _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });

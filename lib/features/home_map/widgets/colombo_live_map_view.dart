@@ -42,12 +42,19 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
     }
   }
 
+  // Frame the destination and every lot so their pins don't pile up, leaving room for the
+  // location card on top and the lot sheet below.
+  CameraFit get _lotsCameraFit => CameraFit.coordinates(
+        coordinates: [
+          LatLng(widget.destination.latitude, widget.destination.longitude),
+          ...widget.activeLots.map((lot) => LatLng(lot.latitude, lot.longitude)),
+        ],
+        padding: const EdgeInsets.fromLTRB(56, 230, 80, 440),
+        maxZoom: 17.5,
+      );
+
   void _fitRoute() {
-    // Focus near the destination
-    _mapController.move(
-      LatLng(widget.destination.latitude, widget.destination.longitude),
-      14.5,
-    );
+    _mapController.fitCamera(_lotsCameraFit);
   }
 
   void recenterPickup() {
@@ -101,6 +108,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
               widget.destination.longitude,
             ),
             initialZoom: 14.2,
+            initialCameraFit: _lotsCameraFit,
             minZoom: 9.0,
             maxZoom: 18.0,
           ),
@@ -187,48 +195,24 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                   ),
                 ),
 
-                // Destination Pin
+                // Destination pin: label-free so it never covers the lot pins clustered around it
                 Marker(
                   point: LatLng(widget.destination.latitude, widget.destination.longitude),
-                  width: 110,
-                  height: 64,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: c.primary,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.25),
-                              blurRadius: 6,
-                            )
-                          ],
-                        ),
-                        child: Text(
-                          'DESTINATION',
-                          style: AppText.caption.copyWith(
-                            color: c.onPrimary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Icon(
-                        Icons.location_on_rounded,
-                        color: c.primary,
-                        size: 26,
-                      ),
-                    ],
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.topCenter,
+                  child: Semantics(
+                    label: 'Destination: ${widget.destination.name}',
+                    child: Icon(Icons.location_on_rounded, color: c.primary, size: 32),
                   ),
                 ),
 
                 // Parking Lots Pins
-                ...widget.activeLots.map((lot) {
+                // Selected lot last so its pin draws on top
+                ...([...widget.activeLots]
+                      ..sort((a, b) => (a.id == widget.selectedLotId ? 1 : 0)
+                          .compareTo(b.id == widget.selectedLotId ? 1 : 0)))
+                    .map((lot) {
                   final isSelected = lot.id == widget.selectedLotId;
                   final isFull = lot.isFull;
 
@@ -307,7 +291,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
         // 2. Map Floating Quick Actions (Right side)
         Positioned(
           right: AppSpace.md,
-          top: 155,
+          top: 212, // below the location card
           child: Column(
             children: [
               // Recenter Destination
@@ -321,7 +305,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                   side: BorderSide(color: c.border),
                 ),
                 onPressed: _fitRoute,
-                tooltip: 'Focus Destination',
+                tooltip: 'Show all parking lots',
                 child: const Icon(Icons.my_location_rounded, size: 20),
               ),
 
@@ -337,6 +321,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                   borderRadius: BorderRadius.circular(12),
                   side: BorderSide(color: c.border),
                 ),
+                tooltip: 'Zoom in',
                 onPressed: () {
                   _mapController.move(
                     _mapController.camera.center,
@@ -358,6 +343,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                   borderRadius: BorderRadius.circular(12),
                   side: BorderSide(color: c.border),
                 ),
+                tooltip: 'Zoom out',
                 onPressed: () {
                   _mapController.move(
                     _mapController.camera.center,

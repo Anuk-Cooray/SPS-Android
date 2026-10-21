@@ -225,7 +225,7 @@ class BookingConfirmedDialog extends StatelessWidget {
                         Text(
                           '15m window starts upon arrival',
                           style: AppText.caption.copyWith(
-                            color: c.accent,
+                            color: c.textSecondary,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -269,16 +269,17 @@ class BookingConfirmedDialog extends StatelessWidget {
             height: 48,
             child: ElevatedButton.icon(
               onPressed: onStartInAppNav,
+              // Primary action = black (white in dark mode); the accent marks only "your" slot
               style: ElevatedButton.styleFrom(
-                backgroundColor: c.accent,
-                foregroundColor: Colors.white,
+                backgroundColor: c.primary,
+                foregroundColor: c.onPrimary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
               icon: const Icon(Icons.navigation_rounded, size: 18),
-              label: const Text(
-                'Start In-App Smart Navigation',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              label: Text(
+                'Start in-app navigation',
+                style: AppText.button.copyWith(fontSize: 15),
               ),
             ),
           ),
@@ -297,9 +298,9 @@ class BookingConfirmedDialog extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               icon: const Icon(Icons.map_rounded, size: 18),
-              label: const Text(
-                'Open in Google Maps App',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              label: Text(
+                'Open in Google Maps',
+                style: AppText.button.copyWith(fontSize: 15),
               ),
             ),
           ),

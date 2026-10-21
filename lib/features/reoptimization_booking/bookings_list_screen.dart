@@ -288,9 +288,10 @@ class _ActiveBookingCard extends StatelessWidget {
               const SizedBox(height: AppSpace.sm),
             ],
 
+            // Filled dot once done, hollow while still pending
             _TimelineItem(
-              dotColor: Colors.transparent,
-              borderColor: c.textSecondary,
+              dotColor: booking.checkedInAt != null ? c.textPrimary : Colors.transparent,
+              borderColor: booking.checkedInAt != null ? null : c.textSecondary,
               title: booking.checkedInAt != null ? 'Checked in at barrier' : 'Check in',
               time: booking.checkedInAt != null
                   ? DateFormat('h:mm a').format(booking.checkedInAt!)
