@@ -116,6 +116,7 @@ class _HardwareIntegrationSimulatorModalState
                   ],
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   onPressed: () => Navigator.of(context).pop(),
                   icon: Icon(Icons.close_rounded, color: c.textSecondary),
                 ),

@@ -139,6 +139,7 @@ class _ColomboSearchModalState extends State<ColomboSearchModal> {
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   icon: Icon(Icons.close_rounded, color: c.textSecondary),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
@@ -176,12 +177,13 @@ class _ColomboSearchModalState extends State<ColomboSearchModal> {
                     ),
                   ),
                   if (_searchCtrl.text.isNotEmpty)
-                    GestureDetector(
-                      onTap: () {
+                    IconButton(
+                      tooltip: 'Clear search',
+                      onPressed: () {
                         _searchCtrl.clear();
                         setState(() {});
                       },
-                      child: Icon(Icons.cancel_rounded, color: c.textSecondary, size: 18),
+                      icon: Icon(Icons.cancel_rounded, color: c.textSecondary, size: 18),
                     ),
                 ],
               ),
