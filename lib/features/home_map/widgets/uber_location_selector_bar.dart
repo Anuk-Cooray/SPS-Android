@@ -114,7 +114,7 @@ class UberLocationSelectorBar extends StatelessWidget {
                                 'START / PICKUP',
                                 style: AppText.caption.copyWith(
                                   color: c.accent,
-                                  fontSize: 9,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.8,
                                 ),
@@ -162,7 +162,7 @@ class UberLocationSelectorBar extends StatelessWidget {
                                 'PARKING DESTINATION',
                                 style: AppText.caption.copyWith(
                                   color: c.accent,
-                                  fontSize: 9,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.8,
                                 ),
@@ -259,7 +259,7 @@ class UberLocationSelectorBar extends StatelessWidget {
                               destination.congestionLevel == 'Very High'
                           ? c.danger
                           : c.warning,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

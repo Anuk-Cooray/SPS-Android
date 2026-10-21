@@ -157,7 +157,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                           'START',
                           style: AppText.caption.copyWith(
                             color: Colors.white,
-                            fontSize: 9,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -206,7 +206,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                           'DESTINATION',
                           style: AppText.caption.copyWith(
                             color: c.onPrimary,
-                            fontSize: 9,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.6,
                           ),
@@ -274,7 +274,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
                                     style: AppText.caption.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 10,
+                                      fontSize: 11,
                                     ),
                                   ),
                                 ],
@@ -379,7 +379,7 @@ class ColomboLiveMapViewState extends State<ColomboLiveMapView> {
               '© OpenStreetMap contributors, © CARTO',
               style: TextStyle(
                 color: Colors.white70,
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: FontWeight.w500,
               ),
             ),

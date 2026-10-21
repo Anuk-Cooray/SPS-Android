@@ -388,11 +388,11 @@ class _FindMyCarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paintRoad = Paint()..color = Colors.white;
+    final paintRoad = Paint()..color = colors.mapRoad;
     canvas.drawRect(Rect.fromLTWH(0, size.height * 0.5, size.width, 24), paintRoad);
 
     final dashPaint = Paint()
-      ..color = Colors.black
+      ..color = colors.textPrimary
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
 
@@ -405,7 +405,7 @@ class _FindMyCarPainter extends CustomPainter {
     canvas.drawLine(corner, end, dashPaint);
 
     // Current location dot
-    canvas.drawCircle(start, 5, Paint()..color = Colors.black);
+    canvas.drawCircle(start, 5, Paint()..color = colors.textPrimary);
 
     // Car pin
     canvas.drawRRect(
@@ -418,5 +418,5 @@ class _FindMyCarPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _FindMyCarPainter oldDelegate) => oldDelegate.colors != colors;
 }

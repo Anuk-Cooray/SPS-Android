@@ -173,7 +173,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     Text(
                       'Tap bay for details',
-                      style: AppText.caption.copyWith(color: c.textSecondary, fontSize: 11),
+                      style: AppText.caption.copyWith(color: c.textSecondary),
                     ),
                   ],
                 ),
@@ -510,7 +510,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               style: AppText.caption.copyWith(
                 color: textColor,
                 fontWeight: FontWeight.w700,
-                fontSize: 10,
+                fontSize: 11,
               ),
             ),
             if (isLateWarning)
@@ -629,7 +629,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(label, style: AppText.caption.copyWith(color: context.colors.textSecondary)),
       ],
     );
   }
@@ -668,7 +668,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           const SizedBox(height: 2),
           Text(
             subtitle,
-            style: AppText.caption.copyWith(color: c.textSecondary, fontSize: 11),
+            style: AppText.caption.copyWith(color: c.textSecondary),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -841,7 +841,7 @@ class _TelemetryEventRow extends StatelessWidget {
               ),
               Text(
                 timeFormatted,
-                style: AppText.caption.copyWith(color: c.textTertiary, fontSize: 11),
+                style: AppText.caption.copyWith(color: c.textTertiary),
               ),
             ],
           ),
@@ -854,7 +854,7 @@ class _TelemetryEventRow extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               'Ref: #${event.bookingId}',
-              style: AppText.caption.copyWith(color: c.textSecondary, fontSize: 11),
+              style: AppText.caption.copyWith(color: c.textSecondary),
             ),
           ],
         ],

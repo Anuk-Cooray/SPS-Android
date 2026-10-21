@@ -525,7 +525,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 2),
                       Text(
                         'Valid for 5 min · Backed by Cloud Firestore',
-                        style: AppText.caption.copyWith(color: c.textSecondary, fontSize: 11),
+                        style: AppText.caption.copyWith(color: c.textSecondary),
                       ),
                     ],
                   ),

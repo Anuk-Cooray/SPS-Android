@@ -315,7 +315,7 @@ class _ColomboSearchModalState extends State<ColomboSearchModal> {
                                               'Crowded',
                                               style: AppText.caption.copyWith(
                                                 color: c.danger,
-                                                fontSize: 10,
+                                                fontSize: 11,
                                                 fontWeight: FontWeight.w700,
                                               ),
                                             ),
