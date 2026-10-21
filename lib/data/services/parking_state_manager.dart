@@ -316,17 +316,19 @@ class ParkingStateManager extends ChangeNotifier {
 
   // Driver-specific active & history bookings
   List<Booking> get activeBookings =>
-      _bookings.where((b) => b.userId == _currentUser.id && b.isActive).toList();
+      _bookings.where((b) => b.userId == _currentUser.id && b.isActive && !b.isLapsed).toList();
 
-  List<Booking> get upcomingBookings =>
-      _bookings.where((b) => b.userId == _currentUser.id && b.status == BookingStatus.reserved).toList();
+  List<Booking> get upcomingBookings => _bookings
+      .where((b) => b.userId == _currentUser.id && b.status == BookingStatus.reserved && !b.isLapsed)
+      .toList();
 
   List<Booking> get historyBookings => _bookings
       .where((b) =>
           b.userId == _currentUser.id &&
           (b.status == BookingStatus.completed ||
               b.status == BookingStatus.cancelled ||
-              b.status == BookingStatus.autoCancelled))
+              b.status == BookingStatus.autoCancelled ||
+              b.isLapsed))
       .toList();
 
   // Admin visibility (all campus reservations across users)

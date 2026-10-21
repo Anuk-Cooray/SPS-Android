@@ -365,8 +365,8 @@ class _SimpleBookingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final isCancelled = booking.status == BookingStatus.cancelled ||
-        booking.status == BookingStatus.autoCancelled;
+    final isReleased = booking.status == BookingStatus.autoCancelled || booking.isLapsed;
+    final isCancelled = booking.status == BookingStatus.cancelled || isReleased;
 
     return InkWell(
       onTap: onTap,
@@ -392,9 +392,11 @@ class _SimpleBookingCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    isCancelled
-                        ? 'Auto-cancelled · Expired grace window'
-                        : 'Completed session · ${booking.durationHours} h · ${DateFormat('d MMM, h:mm a').format(booking.bookedAt)}',
+                    isReleased
+                        ? 'Released · hold expired without check-in'
+                        : isCancelled
+                            ? 'Cancelled by you · ${DateFormat('d MMM, h:mm a').format(booking.bookedAt)}'
+                            : 'Completed session · ${booking.durationHours} h · ${DateFormat('d MMM, h:mm a').format(booking.bookedAt)}',
                     style: AppText.caption.copyWith(color: c.textSecondary),
                   ),
                 ],
@@ -408,7 +410,7 @@ class _SimpleBookingCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  'Cancelled',
+                  isReleased ? 'Released' : 'Cancelled',
                   style: AppText.caption.copyWith(
                     color: c.textSecondary,
                     fontWeight: FontWeight.w600,
