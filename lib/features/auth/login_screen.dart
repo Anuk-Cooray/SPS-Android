@@ -252,9 +252,8 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         const SizedBox(height: AppSpace.xl),
 
-        // Brand Logo and Header Badge
+        // Brand mark
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Container(
               width: 48,
@@ -272,23 +271,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            OutlinedButton.icon(
-              onPressed: () => _selectPresetEmail('newdriver@sliit.lk'),
-              icon: Icon(Icons.person_add_alt_1_rounded, size: 16, color: c.accent),
-              label: Text(
-                'Register New Driver',
-                style: AppText.caption.copyWith(
-                  color: c.accent,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(0, 36),
-                side: BorderSide(color: c.accent.withValues(alpha: 0.4)),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
+            const SizedBox(width: AppSpace.sm),
+            Text('Smart Parking', style: AppText.title.copyWith(color: c.textPrimary)),
           ],
         ),
 
@@ -303,14 +287,19 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: AppSpace.xs),
 
         Text(
-          'Enter your campus email. We will generate and send a 6-digit verification code to verify your session.',
+          "Enter your campus email and we'll send you a 6-digit code. No password needed — new drivers are set up automatically.",
           style: AppText.body.copyWith(color: c.textSecondary),
         ),
 
+        const SizedBox(height: AppSpace.xl),
+
         // Preset quick chips for convenient campus testing
         if (AppConfig.kDemoMode) ...[
+          Text('DEMO ACCOUNTS', style: AppText.overline.copyWith(color: c.textSecondary)),
+          const SizedBox(height: AppSpace.xs),
           Wrap(
-            spacing: AppSpace.sm,
+            spacing: AppSpace.xs,
+            runSpacing: AppSpace.xs,
             children: [
               ActionChip(
                 avatar: const Icon(Icons.account_circle_outlined, size: 16),
@@ -321,6 +310,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 avatar: const Icon(Icons.school_outlined, size: 16),
                 label: const Text('driver@sliit.lk'),
                 onPressed: () => _selectPresetEmail('driver@sliit.lk'),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                label: const Text('New driver'),
+                tooltip: 'Fills newdriver@sliit.lk, an account with no vehicle yet',
+                onPressed: () => _selectPresetEmail('newdriver@sliit.lk'),
               ),
             ],
           ),
@@ -333,6 +328,10 @@ class _LoginScreenState extends State<LoginScreen> {
         TextField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          autocorrect: false,
+          enableSuggestions: false,
+          autofillHints: const [AutofillHints.email],
           style: AppText.body.copyWith(
             color: c.textPrimary,
             fontWeight: FontWeight.w600,
@@ -343,7 +342,7 @@ class _LoginScreenState extends State<LoginScreen> {
               color: c.textSecondary,
               size: 20,
             ),
-            hintText: 'e.g. anuk@example.com',
+            hintText: 'name@sliit.lk',
             errorText: _emailError,
           ),
           onChanged: (_) {
@@ -371,21 +370,10 @@ class _LoginScreenState extends State<LoginScreen> {
               text: 'By continuing you agree to the ',
               style: AppText.caption.copyWith(color: c.textSecondary),
               children: [
-                TextSpan(
-                  text: 'Terms',
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
+                // Plain text until Terms / Privacy pages exist; underlined text implies a link
+                TextSpan(text: 'Terms', style: TextStyle(color: c.textPrimary)),
                 const TextSpan(text: ' and '),
-                TextSpan(
-                  text: 'Privacy Policy',
-                  style: TextStyle(
-                    color: c.textPrimary,
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
+                TextSpan(text: 'Privacy Policy', style: TextStyle(color: c.textPrimary)),
                 const TextSpan(text: '.'),
               ],
             ),
@@ -487,16 +475,9 @@ class _LoginScreenState extends State<LoginScreen> {
           Container(
             padding: const EdgeInsets.all(AppSpace.md),
             decoration: BoxDecoration(
-              color: c.surface,
+              color: c.surfaceMuted,
               borderRadius: BorderRadius.circular(AppRadius.card),
-              border: Border.all(color: c.accent.withValues(alpha: 0.4)),
-              boxShadow: [
-                BoxShadow(
-                  color: c.accent.withValues(alpha: 0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              border: Border.all(color: c.border),
             ),
             child: Row(
               children: [
@@ -504,10 +485,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: c.accentSoft,
+                    color: c.surface,
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: c.border),
                   ),
-                  child: Icon(Icons.mark_email_read_rounded, color: c.accent, size: 20),
+                  child: Icon(Icons.mark_email_read_rounded, color: c.textPrimary, size: AppIconSize.md),
                 ),
                 const SizedBox(width: AppSpace.md),
                 Expanded(
@@ -515,7 +497,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Verification Code: $_lastSentCode',
+                        'Demo code  $_lastSentCode',
                         style: AppText.body.copyWith(
                           color: c.textPrimary,
                           fontWeight: FontWeight.w800,
@@ -524,7 +506,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Valid for 5 min · Backed by Cloud Firestore',
+                        'Shown on the local emulators only; a live backend emails it.',
                         style: AppText.caption.copyWith(color: c.textSecondary),
                       ),
                     ],
@@ -534,13 +516,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: _autoFillCode,
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    backgroundColor: c.accentSoft,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    backgroundColor: c.surface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: c.border),
+                    ),
                   ),
                   child: Text(
                     'Auto-fill code',
                     style: AppText.caption.copyWith(
-                      color: c.accent,
+                      color: c.textPrimary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -569,9 +554,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: c.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: _focusNodes[index].hasFocus
-                        ? c.accent
-                        : (_otpControllers[index].text.isNotEmpty ? c.textPrimary : c.border),
+                    color: _focusNodes[index].hasFocus || _otpControllers[index].text.isNotEmpty
+                        ? c.textPrimary
+                        : c.border,
                     width: _focusNodes[index].hasFocus ? 2 : 1,
                   ),
                 ),
@@ -654,7 +639,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Text(
                     'Resend code',
                     style: AppText.caption.copyWith(
-                      color: c.accent,
+                      color: c.textPrimary,
+                      decoration: TextDecoration.underline,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

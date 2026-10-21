@@ -69,7 +69,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
       backgroundColor: c.background,
       body: Stack(
         children: [
-          // 1. Interactive Colombo Live Map with real OSM / Carto tiles
+          // 1. Interactive Colombo live map (OpenStreetMap tiles)
           Positioned.fill(
             child: ColomboLiveMapView(
               pickup: _pickup,
@@ -81,6 +81,15 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
               },
               onRecenter: () {},
             ),
+          ),
+
+          // Scrim behind the status bar so the clock and icons stay legible over the map
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.paddingOf(context).top,
+            child: ColoredBox(color: c.background.withValues(alpha: 0.9)),
           ),
 
           // 2. Uber-Style Dual Pickup & Destination Selector Bar

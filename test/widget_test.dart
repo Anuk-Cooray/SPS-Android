@@ -77,8 +77,8 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Tap "Register New Driver"
-    await tester.tap(find.text('Register New Driver'));
+    // Pick the "New driver" demo account
+    await tester.tap(find.text('New driver'));
     await tester.pumpAndSettle();
 
     // Tap Send Verification Code

@@ -29,13 +29,18 @@ class ActiveBookingMiniBanner extends StatelessWidget {
     final c = context.colors;
     final now = DateTime.now();
     final isInTransit = now.isBefore(booking.arrivalTime);
+    final isParked = booking.status == BookingStatus.checkedIn || booking.checkedInAt != null;
     final arriveFormatted = DateFormat('h:mm a').format(booking.arrivalTime);
 
     // Calculate remaining text
     String statusSubtitle;
     Color indicatorColor;
 
-    if (isInTransit) {
+    if (isParked) {
+      final since = DateFormat('h:mm a').format((booking.checkedInAt ?? now).toLocal());
+      statusSubtitle = 'Parked · since $since';
+      indicatorColor = c.textPrimary;
+    } else if (isInTransit) {
       final diff = booking.arrivalTime.difference(now);
       final minutesLeft = diff.inMinutes;
       statusSubtitle = minutesLeft > 0
@@ -174,22 +179,18 @@ class ActiveBookingMiniBanner extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: c.accent,
+                    color: c.primary,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
+                    children: [
                       Text(
-                        'Nav',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
+                        isParked ? 'View' : 'Nav',
+                        style: AppText.label.copyWith(color: c.onPrimary, fontWeight: FontWeight.w700),
                       ),
-                      SizedBox(width: 2),
-                      Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 14),
+                      const SizedBox(width: 2),
+                      Icon(Icons.arrow_forward_rounded, color: c.onPrimary, size: AppIconSize.sm),
                     ],
                   ),
                 ),

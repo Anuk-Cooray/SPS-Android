@@ -264,6 +264,56 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
     );
   }
 
+  // Tappable field: Material + InkWell so the ripple shows, with a trailing icon as affordance
+  Widget _buildPickerCard(
+    AppColors c, {
+    required String label,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: true,
+      label: '$label: $value. Tap to change',
+      excludeSemantics: true,
+      child: Material(
+        color: c.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          side: BorderSide(color: c.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpace.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: AppText.caption.copyWith(color: c.textSecondary)),
+                      const SizedBox(height: 4),
+                      Text(
+                        value,
+                        style: AppText.title.copyWith(
+                          color: c.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(icon, color: c.textSecondary, size: AppIconSize.md),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildScorePill(String text, AppColors c) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -741,31 +791,12 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                     children: [
                       // Arrive by
                       Expanded(
-                        child: InkWell(
+                        child: _buildPickerCard(
+                          c,
+                          label: 'Arrive by',
+                          value: arriveTimeFormatted,
+                          icon: Icons.schedule_rounded,
                           onTap: _selectTime,
-                          borderRadius: BorderRadius.circular(AppRadius.card),
-                          child: Container(
-                            padding: const EdgeInsets.all(AppSpace.md),
-                            decoration: BoxDecoration(
-                              color: c.surface,
-                              borderRadius: BorderRadius.circular(AppRadius.card),
-                              border: Border.all(color: c.border),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Arrive by', style: AppText.caption.copyWith(color: c.textSecondary)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  arriveTimeFormatted,
-                                  style: AppText.title.copyWith(
-                                    color: c.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
                       ),
 
@@ -773,31 +804,12 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
 
                       // Duration
                       Expanded(
-                        child: InkWell(
+                        child: _buildPickerCard(
+                          c,
+                          label: 'Duration',
+                          value: '$_durationHours h',
+                          icon: Icons.expand_more_rounded,
                           onTap: _selectDuration,
-                          borderRadius: BorderRadius.circular(AppRadius.card),
-                          child: Container(
-                            padding: const EdgeInsets.all(AppSpace.md),
-                            decoration: BoxDecoration(
-                              color: c.surface,
-                              borderRadius: BorderRadius.circular(AppRadius.card),
-                              border: Border.all(color: c.border),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Duration', style: AppText.caption.copyWith(color: c.textSecondary)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '$_durationHours h',
-                                  style: AppText.title.copyWith(
-                                    color: c.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
                       ),
                     ],

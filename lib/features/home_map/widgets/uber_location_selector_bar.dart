@@ -113,7 +113,7 @@ class UberLocationSelectorBar extends StatelessWidget {
                               Text(
                                 'START / PICKUP',
                                 style: AppText.caption.copyWith(
-                                  color: c.accent,
+                                  color: c.textSecondary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.8,
@@ -161,7 +161,7 @@ class UberLocationSelectorBar extends StatelessWidget {
                               Text(
                                 'PARKING DESTINATION',
                                 style: AppText.caption.copyWith(
-                                  color: c.accent,
+                                  color: c.textSecondary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.8,
@@ -242,25 +242,34 @@ class UberLocationSelectorBar extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: destination.congestionLevel == 'Extreme' ||
-                            destination.congestionLevel == 'Very High'
-                        ? c.danger.withValues(alpha: 0.12)
-                        : c.warning.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${destination.congestionLevel} Traffic',
-                    style: AppText.caption.copyWith(
-                      color: destination.congestionLevel == 'Extreme' ||
-                              destination.congestionLevel == 'Very High'
-                          ? c.danger
-                          : c.warning,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        // Red only for severe congestion; amber is reserved for late arrival
+                        color: destination.congestionLevel == 'Extreme' ||
+                                destination.congestionLevel == 'Very High'
+                            ? c.danger.withValues(alpha: 0.12)
+                            : c.surfaceMuted,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        // A typical level for the area, not live traffic
+                        'Usually ${destination.congestionLevel.toLowerCase()} traffic',
+                        style: AppText.caption.copyWith(
+                          color: destination.congestionLevel == 'Extreme' ||
+                                  destination.congestionLevel == 'Very High'
+                              ? c.danger
+                              : c.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                 ),
