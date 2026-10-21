@@ -2,11 +2,29 @@
     "version": "0.2.0",
     "configurations": [
         {
+            // Free local setup: run the "Firebase emulators: start" task first
+            "name": "Smart Parking (dev, local Firebase emulators)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "deviceId": "emulator-5554",
+            "args": [
+                "--flavor", "dev",
+                "--dart-define=USE_EMULATORS=true",
+                "--dart-define=ENVIRONMENT=dev"
+            ],
+            "env": {
+                "JAVA_HOME": "${env:USERPROFILE}\\tools\\jdk-21",
+                "JAVA_TOOL_OPTIONS": "-Djdk.net.unixdomain.tmpdir=C:\\Users\\Public\\sps-emu"
+            }
+        },
+        {
             "name": "Smart Parking App (Android Emulator)",
             "request": "launch",
             "type": "dart",
             "program": "lib/main.dart",
-            "deviceId": "emulator-5554"
+            "deviceId": "emulator-5554",
+            "args": ["--flavor", "dev"]
         },
         {
             "name": "Smart Parking App (Profile Mode)",
@@ -14,7 +32,8 @@
             "type": "dart",
             "program": "lib/main.dart",
             "deviceId": "emulator-5554",
-            "flutterMode": "profile"
+            "flutterMode": "profile",
+            "args": ["--flavor", "dev"]
         },
         {
             "name": "Smart Parking App (Release Mode)",
@@ -22,7 +41,8 @@
             "type": "dart",
             "program": "lib/main.dart",
             "deviceId": "emulator-5554",
-            "flutterMode": "release"
+            "flutterMode": "release",
+            "args": ["--flavor", "dev"]
         }
     ]
 }
