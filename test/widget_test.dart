@@ -39,7 +39,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify first screen is LoginScreen (Step 1)
-    expect(find.text('Park smarter.\nBook in seconds.'), findsOneWidget);
+    expect(find.text('Book in seconds.'), findsOneWidget);
     expect(find.text('Send Verification Code'), findsOneWidget);
 
     // Tap Send Verification Code with prefilled demo credentials
@@ -244,7 +244,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Back on Step 1
-    expect(find.text('Park smarter.\nBook in seconds.'), findsOneWidget);
+    expect(find.text('Book in seconds.'), findsOneWidget);
     expect(find.text('Send Verification Code'), findsOneWidget);
   });
 }

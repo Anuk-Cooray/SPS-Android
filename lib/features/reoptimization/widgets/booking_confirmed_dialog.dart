@@ -182,8 +182,8 @@ class BookingConfirmedDialog extends StatelessWidget {
                       ),
                       child: Text(
                         booking.slotId,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: c.onAccent,
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
                         ),

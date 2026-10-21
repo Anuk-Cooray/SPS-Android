@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../core/widgets/hold_countdown_timer_widget.dart';
 import '../../data/models/booking_model.dart';
@@ -277,11 +278,7 @@ class BookingDetailModal extends StatelessWidget {
                 // Session Metadata Card
                 Container(
                   padding: const EdgeInsets.all(AppSpace.md),
-                  decoration: BoxDecoration(
-                    color: c.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    border: Border.all(color: c.border),
-                  ),
+                  decoration: glassDecoration(c),
                   child: Column(
                     children: [
                       _buildMetaRow(
@@ -335,11 +332,7 @@ class BookingDetailModal extends StatelessWidget {
 
                 Container(
                   padding: const EdgeInsets.all(AppSpace.lg),
-                  decoration: BoxDecoration(
-                    color: c.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    border: Border.all(color: c.border),
-                  ),
+                  decoration: glassDecoration(c),
                   child: Column(
                     children: [
                       // Step 1: Reservation Created

@@ -36,9 +36,10 @@ class UberLocationSelectorBar extends StatelessWidget {
         vertical: AppSpace.sm,
       ),
       decoration: BoxDecoration(
-        color: c.surface,
+        // Glass over the map
+        color: c.surface.withValues(alpha: 0.9),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: c.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.12),

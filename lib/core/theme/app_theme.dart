@@ -25,6 +25,9 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.onPrimary,
     required this.accent,
     required this.accentSoft,
+    required this.onAccent,
+    required this.success,
+    required this.successSoft,
     required this.warning,
     required this.warningSoft,
     required this.warningBorder,
@@ -50,6 +53,9 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color onPrimary;
   final Color accent; // the ONE colour
   final Color accentSoft; // 10% accent fill (your slot)
+  final Color onAccent; // text/icons on an accent fill
+  final Color success; // free bays, positive states (teal in the dark theme)
+  final Color successSoft;
   final Color warning; // late arrival only
   final Color warningSoft;
   final Color warningBorder;
@@ -77,6 +83,9 @@ class AppColors extends ThemeExtension<AppColors> {
     onPrimary: Color(0xFFFFFFFF),
     accent: Color(0xFF2563EB),
     accentSoft: Color(0x1A2563EB),
+    onAccent: Color(0xFFFFFFFF),
+    success: Color(0xFF047857),
+    successSoft: Color(0x1A059669),
     warning: Color(0xFF92400E),
     warningSoft: Color(0xFFFFFBEB),
     warningBorder: Color(0xFFFDE68A),
@@ -90,30 +99,35 @@ class AppColors extends ThemeExtension<AppColors> {
     mapRoute: Color(0xFF0A0A0A),
   );
 
+  // Dark premium: navy surfaces, electric-blue accent, teal for "free" / positive states.
+  // Contrast on surface #0F1629: text 16.8:1, secondary 8.4:1, tertiary 6.1:1, accent 5.6:1.
   static const dark = AppColors(
-    background: Color(0xFF0B0B0C),
-    surface: Color(0xFF161618),
-    surfaceMuted: Color(0xFF1F1F23),
-    border: Color(0xFF27272A),
-    divider: Color(0xFF1F1F23),
-    textPrimary: Color(0xFFFAFAFA),
-    textSecondary: Color(0xFFA1A1AA),
-    textTertiary: Color(0xFF8E8E98), // 5.6:1 on surface
-    primary: Color(0xFFFAFAFA),
-    onPrimary: Color(0xFF0A0A0A),
-    accent: Color(0xFF3B82F6),
-    accentSoft: Color(0x263B82F6),
+    background: Color(0xFF070B16),
+    surface: Color(0xFF0F1629),
+    surfaceMuted: Color(0xFF17203A),
+    border: Color(0xFF26314F),
+    divider: Color(0xFF1A2440),
+    textPrimary: Color(0xFFF4F7FF),
+    textSecondary: Color(0xFFA7B1C8),
+    textTertiary: Color(0xFF8B96B0),
+    primary: Color(0xFF2563EB), // buttons (white text 5.2:1), drawn as a glowing gradient
+    onPrimary: Color(0xFFFFFFFF),
+    accent: Color(0xFF4F8CFF),
+    accentSoft: Color(0x2E4F8CFF),
+    onAccent: Color(0xFF070B16), // navy on the bright accent: 5.7:1 (white would be 3.2:1)
+    success: Color(0xFF2DD4BF),
+    successSoft: Color(0x262DD4BF),
     warning: Color(0xFFFBBF24),
-    warningSoft: Color(0xFF2A1F0A),
+    warningSoft: Color(0xFF2A2210),
     warningBorder: Color(0xFF5C4310),
     danger: Color(0xFFF87171),
-    slotFreeBorder: Color(0xFF7A7A84), // 4.3:1 on surface
-    slotTaken: Color(0xFF3F3F46),
-    slotBlocked: Color(0xFF27272A),
-    mapLand: Color(0xFF111113),
-    mapBlock: Color(0xFF18181B),
-    mapRoad: Color(0xFF27272A),
-    mapRoute: Color(0xFF3B82F6),
+    slotFreeBorder: Color(0xFF2DD4BF),
+    slotTaken: Color(0xFF2A3350),
+    slotBlocked: Color(0xFF1E2742),
+    mapLand: Color(0xFF0B1222),
+    mapBlock: Color(0xFF131C33),
+    mapRoad: Color(0xFF1C2744),
+    mapRoute: Color(0xFF4F8CFF),
   );
 
   @override
@@ -130,6 +144,9 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? onPrimary,
     Color? accent,
     Color? accentSoft,
+    Color? onAccent,
+    Color? success,
+    Color? successSoft,
     Color? warning,
     Color? warningSoft,
     Color? warningBorder,
@@ -155,6 +172,9 @@ class AppColors extends ThemeExtension<AppColors> {
       onPrimary: onPrimary ?? this.onPrimary,
       accent: accent ?? this.accent,
       accentSoft: accentSoft ?? this.accentSoft,
+      onAccent: onAccent ?? this.onAccent,
+      success: success ?? this.success,
+      successSoft: successSoft ?? this.successSoft,
       warning: warning ?? this.warning,
       warningSoft: warningSoft ?? this.warningSoft,
       warningBorder: warningBorder ?? this.warningBorder,
@@ -186,6 +206,9 @@ class AppColors extends ThemeExtension<AppColors> {
       onPrimary: l(onPrimary, other.onPrimary),
       accent: l(accent, other.accent),
       accentSoft: l(accentSoft, other.accentSoft),
+      onAccent: l(onAccent, other.onAccent),
+      success: l(success, other.success),
+      successSoft: l(successSoft, other.successSoft),
       warning: l(warning, other.warning),
       warningSoft: l(warningSoft, other.warningSoft),
       warningBorder: l(warningBorder, other.warningBorder),
@@ -244,6 +267,34 @@ abstract final class AppIconSize {
   static const double lg = 24;
 }
 
+/// Gradients and glows for the dark premium look.
+abstract final class AppEffects {
+  /// Primary buttons: deep to electric blue (white text >= 5.2:1 across the gradient).
+  static const LinearGradient primaryGradient = LinearGradient(
+    colors: [Color(0xFF1D4ED8), Color(0xFF2563EB)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  /// Screen backdrop: navy with a faint blue lift at the top.
+  static const LinearGradient backdrop = LinearGradient(
+    colors: [Color(0xFF0D1730), Color(0xFF070B16)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  /// Hero headers.
+  static const LinearGradient hero = LinearGradient(
+    colors: [Color(0xFF1E3A8A), Color(0xFF1D4ED8), Color(0xFF0E7490)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static List<BoxShadow> glow(Color color, {double strength = 0.45, double blur = 24}) => [
+        BoxShadow(color: color.withValues(alpha: strength), blurRadius: blur, spreadRadius: -4),
+      ];
+}
+
 abstract final class AppMotion {
   static const Duration fast = Duration(milliseconds: 150);
   static const Duration base = Duration(milliseconds: 200);
@@ -299,7 +350,7 @@ abstract final class AppTheme {
       primary: c.primary,
       onPrimary: c.onPrimary,
       secondary: c.accent,
-      onSecondary: Colors.white,
+      onSecondary: c.onAccent,
       error: c.danger,
       onError: Colors.white,
       surface: c.surface,
@@ -388,7 +439,7 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: BorderSide(color: c.textPrimary, width: 1.5),
+          borderSide: BorderSide(color: c.accent, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
@@ -430,15 +481,24 @@ abstract final class AppTheme {
                   ? FontWeight.w600
                   : FontWeight.w500,
               color: s.contains(WidgetState.selected)
-                  ? c.textPrimary
+                  ? c.accent
                   : c.textSecondary,
             )),
         iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(
               size: 22,
               color: s.contains(WidgetState.selected)
-                  ? c.textPrimary
+                  ? c.accent
                   : c.textSecondary,
             )),
+      ),
+
+      chipTheme: ChipThemeData(
+        backgroundColor: c.surfaceMuted,
+        side: BorderSide(color: c.border),
+        labelStyle: AppText.label.copyWith(color: c.textPrimary),
+        iconTheme: IconThemeData(color: c.accent, size: 16),
+        shape: const StadiumBorder(),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       ),
 
       switchTheme: SwitchThemeData(

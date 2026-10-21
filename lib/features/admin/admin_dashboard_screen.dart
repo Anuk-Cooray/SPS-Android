@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/models/parking_event_model.dart';
 import '../../data/models/parking_lot_model.dart';
@@ -150,11 +151,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           // --- Interactive Live Slot Map (SYS-01 & Hardware Ingestion) ---
           Container(
             padding: const EdgeInsets.all(AppSpace.lg),
-            decoration: BoxDecoration(
-              color: c.surface,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              border: Border.all(color: c.border),
-            ),
+            decoration: glassDecoration(c),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -212,11 +209,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           // Optimization Model Hyperparameters Card (SYS-01 & SYS-03)
           Container(
             padding: const EdgeInsets.all(AppSpace.lg),
-            decoration: BoxDecoration(
-              color: c.surface,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              border: Border.all(color: c.border),
-            ),
+            decoration: glassDecoration(c),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -348,11 +341,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Container(
               padding: const EdgeInsets.all(AppSpace.xl),
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: c.surface,
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: c.border),
-              ),
+              decoration: glassDecoration(c),
               child: Text(
                 'No reservations found for filter "$_selectedFilter"',
                 style: AppText.body.copyWith(color: c.textSecondary),
@@ -398,11 +387,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Container(
               padding: const EdgeInsets.all(AppSpace.lg),
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: c.surface,
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: c.border),
-              ),
+              decoration: glassDecoration(c),
               child: Text(
                 'No telemetry events recorded yet.',
                 style: AppText.body.copyWith(color: c.textSecondary),
@@ -712,11 +697,7 @@ class _ReservationRow extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpace.xs),
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.sm),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: c.border),
-      ),
+      decoration: glassDecoration(c),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/models/parking_lot_model.dart';
 import '../../data/models/parking_slot_model.dart';
@@ -502,11 +503,7 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                   // 1. Lot Layout Grid Card
                   Container(
                     padding: const EdgeInsets.all(AppSpace.lg),
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.card),
-                      border: Border.all(color: c.border),
-                    ),
+                    decoration: glassDecoration(c),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -627,11 +624,7 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                   // 2. Mathematical Scoring & Recommendation Card (SYS-01)
                   Container(
                     padding: const EdgeInsets.all(AppSpace.md),
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.card),
-                      border: Border.all(color: c.border),
-                    ),
+                    decoration: glassDecoration(c, highlight: true),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -829,8 +822,12 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                 AppSpace.lg,
               ),
               decoration: BoxDecoration(
-                color: c.surface,
-                border: Border(top: BorderSide(color: c.border)),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [c.surface, c.background],
+                ),
+                border: Border(top: BorderSide(color: c.accent.withValues(alpha: 0.3))),
               ),
               child: Column(
                 children: [
@@ -922,6 +919,7 @@ class _SlotTile extends StatelessWidget {
                 : (isTaken || isBlocked
                     ? null
                     : Border.all(color: c.slotFreeBorder, width: 1.2)),
+            boxShadow: isSelected ? AppEffects.glow(c.accent, strength: 0.55, blur: 18) : null,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.slot - 1),

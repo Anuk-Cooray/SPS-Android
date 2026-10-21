@@ -179,7 +179,8 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      // Dark premium look everywhere (the light theme is kept for tests and future use)
+      themeMode: ThemeMode.dark,
       routes: {
         '/admin': (_) => const AdminDashboardScreen(),
       },
