@@ -23,7 +23,8 @@
             "label": "Android emulator: start sps_test",
             "type": "process",
             "command": "${env:LOCALAPPDATA}\\Android\\Sdk\\emulator\\emulator.exe",
-            "args": ["-avd", "sps_test"],
+            // Public DNS: on mixed Wi-Fi/Ethernet setups the emulator's default DNS relay can fail
+            "args": ["-avd", "sps_test", "-dns-server", "8.8.8.8"],
             "isBackground": true,
             "problemMatcher": [],
             "presentation": { "panel": "dedicated", "reveal": "silent" }

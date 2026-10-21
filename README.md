@@ -112,7 +112,7 @@ Then run the app against the emulators. Sign-in uses the server-side OTP callabl
 flutter run --flavor dev --dart-define=USE_EMULATORS=true
 ```
 
-Windows troubleshooting: if the Firestore emulator exits with `Unable to establish loopback connection`, the JVM's socket temp path is too long — set `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:\Users\Public\sps-emu` (any short, existing folder). If functions fail to load with `fetch failed`, the runtime started too slowly (common under OneDrive) — set `FUNCTIONS_DISCOVERY_TIMEOUT=60`.
+Windows troubleshooting: if the Firestore emulator exits with `Unable to establish loopback connection`, the JVM's socket temp path is too long — set `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:\Users\Public\sps-emu` (any short, existing folder). If functions fail to load with `fetch failed`, the runtime started too slowly (common under OneDrive); `start-emulators.ps1` pre-loads them and retries automatically. If the Android emulator shows a blank map or `Failed host lookup` errors, its DNS relay is failing: start it with `-dns-server 8.8.8.8` (the VS Code task already does).
 
 ### 4. Running Backend Verification & Concurrency Tests
 Run the automated test suite directly against the live Firestore Emulator:
