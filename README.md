@@ -76,6 +76,15 @@ Everything runs on your machine: Auth, Firestore and Cloud Functions in the emul
 # Terminal 2: start an Android emulator, then run the app against the local backend
 .\scripts\run-app.ps1 -Device emulator-5554
 ```
+**On a real Android phone or tablet** (same Wi-Fi as the PC): enable *Developer options → USB debugging* on the device and connect it by USB, then
+```powershell
+# Terminal 1: emulators that also accept connections from your network
+.\scripts\start-emulators.ps1 -Lan
+# Terminal 2: the script prints your PC's address; use it here (device ID from `flutter devices`)
+.\scripts\run-app.ps1 -EmulatorHost 192.168.1.6 -Device <device-id>
+```
+Windows blocks incoming connections on networks marked *Public*: allow Java and Node.js when Windows asks, or set your Wi-Fi to *Private* (Settings → Network & internet → Wi-Fi → your network). Only debug builds can talk to the emulators (they use plain HTTP).
+
 The scripts expect JDK 21 at `%USERPROFILE%\tools\jdk-21` and the standalone Firebase CLI at `%USERPROFILE%\tools\firebase.exe` (https://firebase.tools/bin/win/latest), falling back to `java` / `firebase` on PATH. Use `-Fresh` to start with empty data. Stop the emulators with Ctrl+C rather than closing the window, or the data is not saved.
 
 ### 1. Prerequisites
