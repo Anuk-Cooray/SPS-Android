@@ -15,11 +15,16 @@
 
 .PARAMETER Fresh
   Ignore the saved emulator data and start empty.
+
+.PARAMETER Lan
+  Also accept connections from other devices on your network (a phone or tablet running
+  the app). Uses a generated firebase.lan.json; firebase.json itself stays local-only.
 #>
 param(
   [string]$Project = 'sps-app-dev',
   [string]$ToolsDir = (Join-Path $env:USERPROFILE 'tools'),
-  [switch]$Fresh
+  [switch]$Fresh,
+  [switch]$Lan
 )
 
 $ErrorActionPreference = 'Stop'
@@ -86,6 +91,26 @@ $watchdog = Start-Job -ArgumentList (Join-Path $functionsDir 'lib\index.js'), $d
 
 $dataDir = Join-Path $root 'emulator-data'
 $fbArgs = @('emulators:start', '--only', 'auth,firestore,functions', '--project', $Project, '--export-on-exit', $dataDir)
+
+if ($Lan) {
+  # Same config, but Auth/Firestore/Functions listen on every interface
+  $config = Get-Content (Join-Path $root 'firebase.json') -Raw | ConvertFrom-Json
+  foreach ($name in @('auth', 'firestore', 'functions')) {
+    $config.emulators.$name | Add-Member -NotePropertyName host -NotePropertyValue '0.0.0.0' -Force
+  }
+  $lanConfig = Join-Path $root 'firebase.lan.json'
+  # Write UTF-8 without a BOM (Windows PowerShell's utf8 adds one, which JSON parsers reject)
+  [System.IO.File]::WriteAllText($lanConfig, ($config | ConvertTo-Json -Depth 20))
+  $fbArgs += @('--config', $lanConfig)
+  $ips = Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+    Select-Object -ExpandProperty IPAddress
+  Write-Host ''
+  Write-Host 'LAN mode: run the app on your device with one of these addresses:'
+  foreach ($ip in $ips) { Write-Host "  .\scripts\run-app.ps1 -EmulatorHost $ip" }
+  Write-Host 'If Windows asks, allow Java and Node.js through the firewall on this network.'
+  Write-Host ''
+}
 if (-not $Fresh -and (Test-Path $dataDir)) {
   $fbArgs += @('--import', $dataDir)
 } else {

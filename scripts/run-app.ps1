@@ -11,10 +11,15 @@
 
 .PARAMETER ToolsDir
   Folder holding jdk-21\ (used for the Android build).
+
+.PARAMETER EmulatorHost
+  Address of the PC running the emulators. Leave unset for the Android emulator; for a real
+  phone or tablet use the PC's Wi-Fi address and start the emulators with -Lan.
 #>
 param(
   [string]$Device,
-  [string]$ToolsDir = (Join-Path $env:USERPROFILE 'tools')
+  [string]$ToolsDir = (Join-Path $env:USERPROFILE 'tools'),
+  [string]$EmulatorHost
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,6 +42,7 @@ try {
 } catch {}
 
 $runArgs = @('run', '--flavor', 'dev', '--dart-define=USE_EMULATORS=true', '--dart-define=ENVIRONMENT=dev')
+if ($EmulatorHost) { $runArgs += "--dart-define=EMULATOR_HOST=$EmulatorHost" }
 if ($Device) { $runArgs += @('-d', $Device) }
 
 Push-Location $root
