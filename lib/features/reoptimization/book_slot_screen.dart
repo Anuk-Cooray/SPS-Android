@@ -418,6 +418,7 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                       border: Border.all(color: c.border),
                     ),
                     child: IconButton(
+                      tooltip: 'Back',
                       icon: Icon(Icons.chevron_left_rounded, color: c.textPrimary, size: 24),
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -884,51 +885,59 @@ class _SlotTile extends StatelessWidget {
     final c = context.colors;
     final isBlocked = slot.state == SlotState.blocked;
     final isTaken = slot.state == SlotState.taken;
+    final stateLabel = isTaken ? 'taken' : (isBlocked ? 'blocked' : 'free');
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 48,
-        height: 68,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? c.accentSoft
-              : (isTaken
-                  ? c.slotTaken
-                  : (isBlocked ? c.slotBlocked : c.surface)),
-          borderRadius: BorderRadius.circular(AppRadius.slot),
-          border: isSelected
-              ? Border.all(color: c.accent, width: 2)
-              : (isTaken || isBlocked
-                  ? null
-                  : Border.all(color: c.slotFreeBorder, width: 1.2)),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.slot - 1),
-          child: Stack(
-            children: [
-              if (isBlocked) const Positioned.fill(child: _DiagonalStripes()),
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (isSelected) ...[
-                      Icon(Icons.check_rounded, color: c.accent, size: 16),
-                      const SizedBox(height: 2),
-                    ],
-                    Text(
-                      slot.id,
-                      style: AppText.caption.copyWith(
-                        color: isSelected
-                            ? c.accent
-                            : (isBlocked ? c.textTertiary : c.textSecondary),
-                        fontWeight: FontWeight.w700,
+    return Semantics(
+      label: 'Slot ${slot.id}, $stateLabel',
+      button: true,
+      enabled: !isTaken && !isBlocked,
+      selected: isSelected,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 48,
+          height: 68,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? c.accentSoft
+                : (isTaken
+                    ? c.slotTaken
+                    : (isBlocked ? c.slotBlocked : c.surface)),
+            borderRadius: BorderRadius.circular(AppRadius.slot),
+            border: isSelected
+                ? Border.all(color: c.accent, width: 2)
+                : (isTaken || isBlocked
+                    ? null
+                    : Border.all(color: c.slotFreeBorder, width: 1.2)),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.slot - 1),
+            child: Stack(
+              children: [
+                if (isBlocked) const Positioned.fill(child: _DiagonalStripes()),
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (isSelected) ...[
+                        Icon(Icons.check_rounded, color: c.accent, size: 16),
+                        const SizedBox(height: 2),
+                      ],
+                      Text(
+                        slot.id,
+                        style: AppText.caption.copyWith(
+                          color: isSelected
+                              ? c.accent
+                              : (isBlocked ? c.textTertiary : c.textSecondary),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

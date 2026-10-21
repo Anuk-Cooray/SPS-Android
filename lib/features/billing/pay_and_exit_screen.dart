@@ -50,6 +50,7 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
                       border: Border.all(color: c.border),
                     ),
                     child: IconButton(
+                      tooltip: 'Back',
                       icon: Icon(Icons.chevron_left_rounded, color: c.textPrimary, size: 24),
                       onPressed: () => Navigator.pop(context),
                     ),

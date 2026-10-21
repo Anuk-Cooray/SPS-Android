@@ -155,6 +155,7 @@ class _TelemetryExportModalState extends State<TelemetryExportModal> {
                 ],
               ),
               IconButton(
+                tooltip: 'Close',
                 icon: Icon(Icons.close_rounded, color: c.textSecondary),
                 onPressed: () => Navigator.pop(context),
               ),
