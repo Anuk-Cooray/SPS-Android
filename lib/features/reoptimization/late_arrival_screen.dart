@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../data/models/booking_model.dart';
+import '../../data/services/parking_state_manager.dart';
 
 class LateArrivalModal extends StatefulWidget {
   final Booking booking;
@@ -39,12 +42,13 @@ class LateArrivalModal extends StatefulWidget {
 }
 
 class _LateArrivalModalState extends State<LateArrivalModal> {
-  int _secondsLeft = 299; // 4:59 as in mockup
+  late int _secondsLeft;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    _secondsLeft = widget.booking.remainingHoldDuration.inSeconds;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsLeft > 0) {
         setState(() => _secondsLeft--);
@@ -59,6 +63,11 @@ class _LateArrivalModalState extends State<LateArrivalModal> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  static String _etaLabel(int etaMinutes) {
+    final arrival = DateTime.now().add(Duration(minutes: etaMinutes));
+    return '$etaMinutes min · ${DateFormat('h:mm a').format(arrival)}';
   }
 
   @override
@@ -171,7 +180,7 @@ class _LateArrivalModalState extends State<LateArrivalModal> {
             children: [
               Text('Your ETA', style: AppText.body.copyWith(color: c.textSecondary)),
               Text(
-                '8 min · 10:53 AM',
+                _etaLabel(context.watch<ParkingStateManager>().etaMinutes),
                 style: AppText.title.copyWith(
                   color: c.textPrimary,
                   fontWeight: FontWeight.w700,

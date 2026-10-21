@@ -152,6 +152,18 @@ class Booking {
     return DateTime.now().isAfter(effectiveHoldDeadline);
   }
 
+  /// Hourly rate implied by the booked duration and fee.
+  int get hourlyRate => durationHours > 0 ? (estimatedFee / durationHours).round() : estimatedFee;
+
+  /// Parking fee for a stay of [parked]: the booked fee, plus every started hour
+  /// beyond the booked duration at [hourlyRate]. Extensions are billed separately.
+  int parkingFeeFor(Duration parked) {
+    final minutes = parked.isNegative ? 0 : parked.inMinutes;
+    final startedHours = minutes == 0 ? 1 : (minutes / 60).ceil();
+    final overtimeHours = startedHours - durationHours;
+    return overtimeHours > 0 ? estimatedFee + overtimeHours * hourlyRate : estimatedFee;
+  }
+
   bool get isActive =>
       status == BookingStatus.reserved ||
       status == BookingStatus.upgraded ||

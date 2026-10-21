@@ -315,7 +315,7 @@ class ProfileScreen extends StatelessWidget {
                   ListTile(
                     title: Text('Payment methods', style: AppText.title.copyWith(color: c.textPrimary)),
                     trailing: Text(
-                      user.defaultPaymentMethod ?? 'Visa •••• 4821',
+                      user.defaultPaymentMethod ?? 'None saved',
                       style: AppText.body.copyWith(color: c.textSecondary),
                     ),
                   ),

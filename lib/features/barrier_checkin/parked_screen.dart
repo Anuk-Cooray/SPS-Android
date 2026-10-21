@@ -2,9 +2,14 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/google_maps_launcher.dart';
 import '../../core/widgets/app_buttons.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../data/models/booking_model.dart';
+import '../../data/models/parking_lot_model.dart';
+import '../../data/services/parking_state_manager.dart';
 
 class ParkedScreen extends StatefulWidget {
   final Booking booking;
@@ -43,6 +48,36 @@ class _ParkedScreenState extends State<ParkedScreen> {
     super.dispose();
   }
 
+  ParkingLot? _lotFor(BuildContext context) {
+    for (final lot in context.read<ParkingStateManager>().lots) {
+      if (lot.id == booking.lotId) return lot;
+    }
+    return null;
+  }
+
+  int? _walkingDistanceMeters(ParkingLot? lot) {
+    if (lot == null) return null;
+    for (final slot in lot.slots) {
+      if (slot.id == booking.slotId) return slot.walkingDistanceMeters;
+    }
+    return null;
+  }
+
+  Future<void> _openLotInMaps(BuildContext context, ParkingLot? lot) async {
+    if (lot == null) {
+      showAppSnack(context, 'Location for ${booking.lotName} is not available.', tone: SnackTone.warning);
+      return;
+    }
+    final opened = await GoogleMapsLauncher.openLocation(
+      latitude: lot.latitude,
+      longitude: lot.longitude,
+      label: '${lot.name} · Bay ${booking.slotId}',
+    );
+    if (!opened && context.mounted) {
+      showAppSnack(context, "Couldn't open Maps on this device.", tone: SnackTone.warning);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -51,9 +86,9 @@ class _ParkedScreenState extends State<ParkedScreen> {
     final bookedMinutes = max(1, booking.durationHours * 60);
     final progress = (safeElapsed.inMinutes / bookedMinutes).clamp(0.0, 1.0);
     final elapsedLabel = '${safeElapsed.inHours}:${(safeElapsed.inMinutes % 60).toString().padLeft(2, '0')}';
-    final hourlyRate = booking.durationHours > 0 ? booking.estimatedFee / booking.durationHours : 0;
-    final billedHours = max(1, (safeElapsed.inMinutes / 60).ceil());
-    final feeSoFar = (hourlyRate * billedHours).round();
+    final feeSoFar = booking.parkingFeeFor(safeElapsed) + booking.extensionFee;
+    final lot = _lotFor(context);
+    final walkMeters = _walkingDistanceMeters(lot);
 
     return Scaffold(
       backgroundColor: c.background,
@@ -288,7 +323,9 @@ class _ParkedScreenState extends State<ParkedScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '210 m away · 3 min walk',
+                                  walkMeters != null
+                                      ? '$walkMeters m from the entrance · ${max(1, (walkMeters / 80).ceil())} min walk'
+                                      : 'Bay ${booking.slotId} · ${booking.lotName}',
                                   style: AppText.caption.copyWith(color: c.textSecondary),
                                 ),
                               ],
@@ -297,12 +334,7 @@ class _ParkedScreenState extends State<ParkedScreen> {
                           const SizedBox(width: AppSpace.sm),
                           OutlinedButton(
                             onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Opening walking directions to your vehicle...'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
+                              _openLotInMaps(context, lot);
                             },
                             style: OutlinedButton.styleFrom(
                               minimumSize: const Size(90, 40),
