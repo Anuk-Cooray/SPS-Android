@@ -62,8 +62,10 @@ class FirestoreService {
       _functions.idTokenProvider = () => _auth.getIdToken();
       if (useEmulator) {
         final host = _functions.emulatorHost;
-        _firestore!.useFirestoreEmulator(host, firestoreEmulatorPort);
-        fb.FirebaseAuth.instance.useAuthEmulator(host, authEmulatorPort);
+        // Host mapping is done above (127.0.0.1 -> 10.0.2.2 only on the Android emulator); the
+        // plugins' own mapping would also rewrite "localhost", breaking real devices on USB
+        _firestore!.useFirestoreEmulator(host, firestoreEmulatorPort, automaticHostMapping: false);
+        fb.FirebaseAuth.instance.useAuthEmulator(host, authEmulatorPort, automaticHostMapping: false);
         debugPrint('[FirestoreService] Using Firebase emulators at $host');
       }
     } catch (e) {
