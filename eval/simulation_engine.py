@@ -67,14 +67,17 @@ def generate_trip_stream(
     demand_per_hour_override: Optional[float] = None,
     no_show_rate_override: Optional[float] = None,
     mean_delay_override: Optional[float] = None,
+    profile: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
+    """profile: optional empirical calibration from eval/dataset_profile.py (hourly shape,
+    observed stay lengths, vehicle mix). Without it the stream is the config-defined baseline."""
     rng = random.Random(seed)
 
     dem_cfg = config.get("demand", {})
     stoch_cfg = config.get("stochastic_driver", {})
 
     base_demand = demand_per_hour_override if demand_per_hour_override is not None else dem_cfg.get("baseline_drivers_per_hour", 60)
-    hourly_multipliers = dem_cfg.get("hourly_profile", [1.0] * 24)
+    hourly_multipliers = profile["hourly_profile"] if profile else dem_cfg.get("hourly_profile", [1.0] * 24)
     no_show_rate = no_show_rate_override if no_show_rate_override is not None else stoch_cfg.get("no_show_rate_default", 0.12)
     mean_delay = mean_delay_override if mean_delay_override is not None else stoch_cfg.get("mean_delay_minutes_default", 3.5)
     std_delay = stoch_cfg.get("delay_std_minutes", 4.0)
@@ -113,14 +116,19 @@ def generate_trip_stream(
             is_no_show = rng.random() < no_show_rate
 
             # Planned parking dwell duration (min 30 mins)
-            dwell_hours = max(0.5, rng.gauss(duration_mean, duration_std))
+            if profile:
+                durations = profile["duration_hours"]
+                dwell_hours = max(0.5, durations[int(rng.random() * len(durations))])
+            else:
+                dwell_hours = max(0.5, rng.gauss(duration_mean, duration_std))
             dwell_seconds = dwell_hours * 3600.0
 
             # Vehicle size distribution (60% small, 30% medium, 10% large)
             v_roll = rng.random()
-            if v_roll < 0.60:
+            small_cut, medium_cut = profile["vehicle_cutoffs"] if profile else (0.60, 0.90)
+            if v_roll < small_cut:
                 v_size = "small"
-            elif v_roll < 0.90:
+            elif v_roll < medium_cut:
                 v_size = "medium"
             else:
                 v_size = "large"
