@@ -1,0 +1,59 @@
+name: Teams PR Notification
+
+on:
+  pull_request:
+    types: [opened, closed, reopened]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send card to Teams
+        env:
+          WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          ACTION: ${{ github.event.action }}
+          MERGED: ${{ github.event.pull_request.merged }}
+          TITLE: ${{ github.event.pull_request.title }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          CREATED: ${{ github.event.pull_request.created_at }}
+          UPDATED: ${{ github.event.pull_request.updated_at }}
+          URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          if [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; then
+            HEADER="✅ Pull Request Merged"; COLOR="Good"; STATUS="Merged"
+          elif [ "$ACTION" = "closed" ]; then
+            HEADER="❌ Pull Request Closed"; COLOR="Attention"; STATUS="Closed"
+          else
+            HEADER="🆕 Pull Request Opened"; COLOR="Accent"; STATUS="Open"
+          fi
+          jq -n --arg h "$HEADER" --arg c "$COLOR" --arg s "$STATUS" \
+            --arg t "$TITLE" --arg n "$NUMBER" --arg a "$AUTHOR" \
+            --arg hb "$HEAD" --arg bb "$BASE" --arg cr "$CREATED" \
+            --arg up "$UPDATED" --arg u "$URL" '{
+            type: "message",
+            attachments: [{
+              contentType: "application/vnd.microsoft.card.adaptive",
+              content: {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                type: "AdaptiveCard", version: "1.4",
+                body: [
+                  {type: "TextBlock", text: $h, size: "Large", weight: "Bolder", color: $c},
+                  {type: "FactSet", facts: [
+                    {title: "Title", value: $t},
+                    {title: "PR Number", value: $n},
+                    {title: "Author", value: $a},
+                    {title: "Status", value: $s},
+                    {title: "Source Branch", value: $hb},
+                    {title: "Target Branch", value: $bb},
+                    {title: "Created", value: $cr},
+                    {title: "Last Updated", value: $up}
+                  ]}
+                ],
+                actions: [{type: "Action.OpenUrl", title: "View on GitHub", url: $u}]
+              }
+            }]
+          }' > card.json
+          curl -sS -X POST -H "Content-Type: application/json" -d @card.json "$WEBHOOK_URL"
