@@ -13,47 +13,80 @@ jobs:
           WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
           ACTION: ${{ github.event.action }}
           MERGED: ${{ github.event.pull_request.merged }}
+          REPO: ${{ github.repository }}
           TITLE: ${{ github.event.pull_request.title }}
           NUMBER: ${{ github.event.pull_request.number }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
+          AVATAR: ${{ github.event.pull_request.user.avatar_url }}
           HEAD: ${{ github.event.pull_request.head.ref }}
           BASE: ${{ github.event.pull_request.base.ref }}
+          COMMITS: ${{ github.event.pull_request.commits }}
+          ADDS: ${{ github.event.pull_request.additions }}
+          DELS: ${{ github.event.pull_request.deletions }}
+          FILES: ${{ github.event.pull_request.changed_files }}
           CREATED: ${{ github.event.pull_request.created_at }}
-          UPDATED: ${{ github.event.pull_request.updated_at }}
+          MERGED_AT: ${{ github.event.pull_request.merged_at }}
+          MERGED_BY: ${{ github.event.pull_request.merged_by.login }}
           URL: ${{ github.event.pull_request.html_url }}
         run: |
+          fmt() { [ -n "$1" ] && TZ=Asia/Colombo date -d "$1" '+%b %d, %Y • %I:%M %p' || echo ""; }
+          C=$(fmt "$CREATED"); M=$(fmt "$MERGED_AT")
+
           if [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; then
-            HEADER="✅ Pull Request Merged"; COLOR="Good"; STATUS="Merged"
+            HEADER="🎉 Pull Request Merged"; STYLE="good"; STATUS="🟣 Merged"
           elif [ "$ACTION" = "closed" ]; then
-            HEADER="❌ Pull Request Closed"; COLOR="Attention"; STATUS="Closed"
+            HEADER="❌ Pull Request Closed"; STYLE="attention"; STATUS="🔴 Closed"
+          elif [ "$ACTION" = "reopened" ]; then
+            HEADER="🔄 Pull Request Reopened"; STYLE="accent"; STATUS="🟢 Reopened"
           else
-            HEADER="🆕 Pull Request Opened"; COLOR="Accent"; STATUS="Open"
+            HEADER="🚀 New Pull Request"; STYLE="accent"; STATUS="🟢 Open"
           fi
-          jq -n --arg h "$HEADER" --arg c "$COLOR" --arg s "$STATUS" \
-            --arg t "$TITLE" --arg n "$NUMBER" --arg a "$AUTHOR" \
-            --arg hb "$HEAD" --arg bb "$BASE" --arg cr "$CREATED" \
-            --arg up "$UPDATED" --arg u "$URL" '{
+
+          jq -n --arg h "$HEADER" --arg style "$STYLE" --arg s "$STATUS" \
+            --arg repo "$REPO" --arg t "$TITLE" --arg n "$NUMBER" \
+            --arg a "$AUTHOR" --arg av "$AVATAR" --arg hb "$HEAD" --arg bb "$BASE" \
+            --arg commits "$COMMITS" --arg add "$ADDS" --arg del "$DELS" --arg files "$FILES" \
+            --arg cr "$C" --arg m "$M" --arg mb "$MERGED_BY" --arg u "$URL" '
+          ([
+            {title: "🌿 Branch",  value: ($hb + "  →  " + $bb)},
+            {title: "📊 Status",  value: $s},
+            {title: "🧮 Changes", value: ("+" + $add + " / -" + $del + " in " + $files + " files")},
+            {title: "🔁 Commits", value: $commits},
+            {title: "📅 Opened",  value: $cr}
+          ] + (if $m != "" then
+                [{title: "✅ Merged", value: ($m + (if $mb != "" then "  by " + $mb else "" end))}]
+              else [] end)) as $facts
+          | {
             type: "message",
             attachments: [{
               contentType: "application/vnd.microsoft.card.adaptive",
               content: {
                 "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
                 type: "AdaptiveCard", version: "1.4",
+                msteams: {width: "Full"},
                 body: [
-                  {type: "TextBlock", text: $h, size: "Large", weight: "Bolder", color: $c},
-                  {type: "FactSet", facts: [
-                    {title: "Title", value: $t},
-                    {title: "PR Number", value: $n},
-                    {title: "Author", value: $a},
-                    {title: "Status", value: $s},
-                    {title: "Source Branch", value: $hb},
-                    {title: "Target Branch", value: $bb},
-                    {title: "Created", value: $cr},
-                    {title: "Last Updated", value: $up}
-                  ]}
+                  {type: "Container", style: $style, bleed: true, items: [
+                    {type: "TextBlock", text: $h, size: "Large", weight: "Bolder", wrap: true},
+                    {type: "TextBlock", text: ("📦 " + $repo), isSubtle: true, spacing: "None", wrap: true}
+                  ]},
+                  {type: "ColumnSet", spacing: "Medium", columns: [
+                    {type: "Column", width: "auto", items: [
+                      {type: "Image", url: $av, size: "Small", style: "Person"}
+                    ]},
+                    {type: "Column", width: "stretch", verticalContentAlignment: "Center", items: [
+                      {type: "TextBlock", text: ("**#" + $n + "**  " + $t), wrap: true},
+                      {type: "TextBlock", text: ("by " + $a), isSubtle: true, spacing: "None"}
+                    ]}
+                  ]},
+                  {type: "FactSet", spacing: "Medium", facts: $facts}
                 ],
-                actions: [{type: "Action.OpenUrl", title: "View on GitHub", url: $u}]
+                actions: [
+                  {type: "Action.OpenUrl", title: "🔍 View PR",       url: $u},
+                  {type: "Action.OpenUrl", title: "📄 Files Changed", url: ($u + "/files")},
+                  {type: "Action.OpenUrl", title: "📦 Repository",    url: ("https://github.com/" + $repo)}
+                ]
               }
             }]
           }' > card.json
+
           curl -sS -X POST -H "Content-Type: application/json" -d @card.json "$WEBHOOK_URL"
