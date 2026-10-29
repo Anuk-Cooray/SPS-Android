@@ -1,4 +1,4 @@
-# Smart Parking System (SPS) (00Testingggg00)
+# Smart Parking System (SPS)
 **SLIIT Research Project J26-IT-335**
 
 A mobile application for intelligent parking lot management, featuring dynamic slot re-optimization, vision-based occupancy monitoring, automated QR barrier access, and digital billing.
