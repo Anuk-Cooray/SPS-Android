@@ -1,13 +1,17 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'data/models/booking_model.dart';
 import 'data/models/parking_lot_model.dart';
 import 'data/models/parking_slot_model.dart';
 import 'data/models/vehicle_model.dart';
+import 'data/services/firestore_service.dart';
 import 'data/services/parking_state_manager.dart';
 import 'features/admin/admin_dashboard_screen.dart';
 import 'features/auth/login_screen.dart';
+import 'features/auth/vehicle_onboarding_screen.dart';
 import 'features/barrier_checkin/check_in_screen.dart';
 import 'features/barrier_checkin/parked_screen.dart';
 import 'features/billing/pay_and_exit_screen.dart';
@@ -17,8 +21,17 @@ import 'features/reoptimization/late_arrival_screen.dart';
 import 'features/reoptimization/navigation_screen.dart';
 import 'features/reoptimization/upgrade_offer_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    FirestoreService().initialize(
+      useEmulator: AppConfig.useEmulators,
+      emulatorHost: AppConfig.emulatorHost,
+    );
+  } catch (e) {
+    debugPrint('[Firebase] Initialization skipped or running offline: $e');
+  }
   runApp(
     ChangeNotifierProvider(
       create: (_) => ParkingStateManager(),
@@ -35,8 +48,6 @@ class SmartParkingApp extends StatefulWidget {
 }
 
 class _SmartParkingAppState extends State<SmartParkingApp> {
-  bool _isLoggedIn = true;
-
   void _openLotBooking(BuildContext context, ParkingLot lot) {
     Navigator.push(
       context,
@@ -83,6 +94,7 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
               context: ctx,
               booking: booking,
               newSlot: candidate,
+              evaluationResult: state.lastUpgradeEvaluation,
               onAccept: () {
                 state.acceptUpgrade();
                 Navigator.pop(ctx);
@@ -167,31 +179,48 @@ class _SmartParkingAppState extends State<SmartParkingApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
-      home: _isLoggedIn
-          ? Builder(
-              builder: (ctx) => NavigationShell(
-                onSelectLot: (lot) => _openLotBooking(ctx, lot),
-                onOpenActiveBooking: (booking) {
-                  if (booking.status == BookingStatus.checkedIn) {
-                    _openParked(ctx, booking);
-                  } else {
-                    _openNavigation(ctx, booking);
-                  }
-                },
-                onLogout: () {
-                  setState(() => _isLoggedIn = false);
-                },
-              ),
-            )
-          : LoginScreen(
-              onLoginSuccess: () {
-                setState(() => _isLoggedIn = true);
-              },
-            ),
+      // Dark premium look everywhere (the light theme is kept for tests and future use)
+      themeMode: ThemeMode.dark,
       routes: {
         '/admin': (_) => const AdminDashboardScreen(),
       },
+      home: Consumer<ParkingStateManager>(
+        builder: (context, state, _) {
+          if (!state.isInitialized) {
+            return const Scaffold(
+              body: SizedBox.shrink(),
+            );
+          }
+
+          if (!state.isLoggedIn) {
+            return LoginScreen(
+              onLoginSuccess: () {},
+            );
+          }
+
+          if (!state.hasRegisteredVehicle) {
+            return VehicleOnboardingScreen(
+              onOnboardingComplete: () {},
+            );
+          }
+
+          return Builder(
+            builder: (ctx) => NavigationShell(
+              onSelectLot: (lot) => _openLotBooking(ctx, lot),
+              onOpenActiveBooking: (booking) {
+                if (booking.status == BookingStatus.checkedIn) {
+                  _openParked(ctx, booking);
+                } else {
+                  _openNavigation(ctx, booking);
+                }
+              },
+              onLogout: () {
+                state.logout();
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 }

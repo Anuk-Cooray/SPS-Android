@@ -110,12 +110,13 @@ class ProfileScreen extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: c.primary,
+                    gradient: AppEffects.hero,
                     shape: BoxShape.circle,
+                    boxShadow: AppEffects.glow(c.accent, strength: 0.5, blur: 20),
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    'AC',
+                    _initials(user.name),
                     style: AppText.h2.copyWith(
                       color: c.onPrimary,
                       fontWeight: FontWeight.w700,
@@ -272,7 +273,7 @@ class ProfileScreen extends StatelessWidget {
                       style: AppText.title.copyWith(color: c.textPrimary),
                     ),
                     subtitle: Text(
-                      'Weights the AI slot pick',
+                      'Prioritizes bays closer to building entrances',
                       style: AppText.caption.copyWith(color: c.textSecondary),
                     ),
                     value: prefs.preferNearEntrance,
@@ -315,7 +316,7 @@ class ProfileScreen extends StatelessWidget {
                   ListTile(
                     title: Text('Payment methods', style: AppText.title.copyWith(color: c.textPrimary)),
                     trailing: Text(
-                      user.defaultPaymentMethod ?? 'Visa •••• 4821',
+                      user.defaultPaymentMethod ?? 'None saved',
                       style: AppText.body.copyWith(color: c.textSecondary),
                     ),
                   ),
@@ -350,4 +351,13 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Up to two initials from a display name, e.g. "Anuk Cooray" -> "AC", "DRIVER" -> "D".
+String _initials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  if (parts.isEmpty) return '?';
+  final first = parts.first[0];
+  final last = parts.length > 1 ? parts.last[0] : '';
+  return (first + last).toUpperCase();
 }

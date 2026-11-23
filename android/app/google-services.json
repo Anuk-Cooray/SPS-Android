@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "818252761771",
+    "project_id": "sps-app-c3f90",
+    "storage_bucket": "sps-app-c3f90.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:818252761771:android:3204002d34b913e742c5ee",
+        "android_client_info": {
+          "package_name": "com.sliit.smartparking.smart_parking"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAor55zJ__TN0TcvSsPST33PEP75yuE-wQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,10 +1,18 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/glass_card.dart';
+import '../../core/utils/google_maps_launcher.dart';
 import '../../core/widgets/app_buttons.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../../data/models/booking_model.dart';
+import '../../data/models/parking_lot_model.dart';
+import '../../data/services/parking_state_manager.dart';
 
-class ParkedScreen extends StatelessWidget {
+class ParkedScreen extends StatefulWidget {
   final Booking booking;
   final VoidCallback onExitParking;
 
@@ -15,8 +23,79 @@ class ParkedScreen extends StatelessWidget {
   });
 
   @override
+  State<ParkedScreen> createState() => _ParkedScreenState();
+}
+
+class _ParkedScreenState extends State<ParkedScreen> {
+  late final DateTime _parkedAt;
+  Timer? _ticker;
+
+  Booking get booking => widget.booking;
+  VoidCallback get onExitParking => widget.onExitParking;
+
+  @override
+  void initState() {
+    super.initState();
+    // The booking handed over may predate check-in; prefer the latest copy, else the
+    // screen opens at check-in
+    final latest = context
+        .read<ParkingStateManager>()
+        .bookings
+        .where((b) => b.id == booking.id)
+        .firstOrNull;
+    _parkedAt = (latest?.checkedInAt ?? booking.checkedInAt)?.toLocal() ?? DateTime.now();
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  ParkingLot? _lotFor(BuildContext context) {
+    for (final lot in context.read<ParkingStateManager>().lots) {
+      if (lot.id == booking.lotId) return lot;
+    }
+    return null;
+  }
+
+  int? _walkingDistanceMeters(ParkingLot? lot) {
+    if (lot == null) return null;
+    for (final slot in lot.slots) {
+      if (slot.id == booking.slotId) return slot.walkingDistanceMeters;
+    }
+    return null;
+  }
+
+  Future<void> _openLotInMaps(BuildContext context, ParkingLot? lot) async {
+    if (lot == null) {
+      showAppSnack(context, 'Location for ${booking.lotName} is not available.', tone: SnackTone.warning);
+      return;
+    }
+    final opened = await GoogleMapsLauncher.openLocation(
+      latitude: lot.latitude,
+      longitude: lot.longitude,
+      label: '${lot.name} · Bay ${booking.slotId}',
+    );
+    if (!opened && context.mounted) {
+      showAppSnack(context, "Couldn't open Maps on this device.", tone: SnackTone.warning);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final elapsed = DateTime.now().difference(_parkedAt);
+    final safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+    final bookedMinutes = max(1, booking.durationHours * 60);
+    final progress = (safeElapsed.inMinutes / bookedMinutes).clamp(0.0, 1.0);
+    final elapsedLabel = '${safeElapsed.inHours}:${(safeElapsed.inMinutes % 60).toString().padLeft(2, '0')}';
+    final feeSoFar = booking.parkingFeeFor(safeElapsed) + booking.extensionFee;
+    final lot = _lotFor(context);
+    final walkMeters = _walkingDistanceMeters(lot);
 
     return Scaffold(
       backgroundColor: c.background,
@@ -27,13 +106,32 @@ class ParkedScreen extends StatelessWidget {
             children: [
               const SizedBox(height: AppSpace.sm),
 
-              // Top Title & Session Active badge
+              // Top Title & Session Active badge with Return Button
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Parked',
-                    style: AppText.h1.copyWith(color: c.textPrimary),
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: c.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: c.border),
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.arrow_back_rounded, color: c.textPrimary, size: 22),
+                          tooltip: 'Return to Main Screen',
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.md),
+                      Text(
+                        'Parked',
+                        style: AppText.h1.copyWith(color: c.textPrimary),
+                      ),
+                    ],
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -74,9 +172,10 @@ class ParkedScreen extends StatelessWidget {
                 height: 240,
                 child: CustomPaint(
                   painter: _CircularTimerPainter(
-                    progress: 0.40,
-                    trackColor: c.divider,
-                    fillColor: c.primary,
+                    progress: progress,
+                    trackColor: c.surfaceMuted,
+                    fillColor: c.accent,
+                    endColor: c.success,
                   ),
                   child: Center(
                     child: Column(
@@ -88,7 +187,7 @@ class ParkedScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '0:48',
+                          elapsedLabel,
                           style: AppText.display.copyWith(
                             color: c.textPrimary,
                             fontSize: 44,
@@ -110,11 +209,7 @@ class ParkedScreen extends StatelessWidget {
 
               // 3-Column Stats Card
               Container(
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: c.border),
-                ),
+                decoration: glassDecoration(c),
                 child: IntrinsicHeight(
                   child: Row(
                     children: [
@@ -153,7 +248,7 @@ class ParkedScreen extends StatelessWidget {
                               Text('In at', style: AppText.caption.copyWith(color: c.textSecondary)),
                               const SizedBox(height: 2),
                               Text(
-                                '10:21',
+                                DateFormat('HH:mm').format(_parkedAt),
                                 style: AppText.h2.copyWith(color: c.textPrimary),
                               ),
                             ],
@@ -175,7 +270,7 @@ class ParkedScreen extends StatelessWidget {
                               Text('Fee so far', style: AppText.caption.copyWith(color: c.textSecondary)),
                               const SizedBox(height: 2),
                               Text(
-                                'LKR 100',
+                                'LKR $feeSoFar',
                                 style: AppText.h2.copyWith(color: c.textPrimary),
                               ),
                             ],
@@ -191,11 +286,7 @@ class ParkedScreen extends StatelessWidget {
 
               // Find My Car Card
               Container(
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: c.border),
-                ),
+                decoration: glassDecoration(c),
                 child: Column(
                   children: [
                     // Mini Schematic Map
@@ -222,28 +313,28 @@ class ParkedScreen extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Find my car',
-                                style: AppText.title.copyWith(color: c.textPrimary),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '210 m away · 3 min walk',
-                                style: AppText.caption.copyWith(color: c.textSecondary),
-                              ),
-                            ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Find my car',
+                                  style: AppText.title.copyWith(color: c.textPrimary),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  walkMeters != null
+                                      ? '$walkMeters m from the entrance · ${max(1, (walkMeters / 80).ceil())} min walk'
+                                      : 'Bay ${booking.slotId} · ${booking.lotName}',
+                                  style: AppText.caption.copyWith(color: c.textSecondary),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: AppSpace.sm),
                           OutlinedButton(
                             onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Opening walking directions to your vehicle...'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
+                              _openLotInMaps(context, lot);
                             },
                             style: OutlinedButton.styleFrom(
                               minimumSize: const Size(90, 40),
@@ -281,11 +372,13 @@ class _CircularTimerPainter extends CustomPainter {
   final double progress;
   final Color trackColor;
   final Color fillColor;
+  final Color endColor;
 
   _CircularTimerPainter({
     required this.progress,
     required this.trackColor,
     required this.fillColor,
+    required this.endColor,
   });
 
   @override
@@ -300,21 +393,31 @@ class _CircularTimerPainter extends CustomPainter {
       ..strokeWidth = 10;
     canvas.drawCircle(center, radius, trackPaint);
 
-    // Active progress arc
+    // Active progress arc: blue -> teal sweep with a soft glow underneath
+    final sweepAngle = 2 * pi * progress;
+    if (sweepAngle <= 0) return;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final shader = SweepGradient(
+      startAngle: 0,
+      endAngle: 2 * pi,
+      colors: [fillColor, endColor, fillColor],
+      transform: const GradientRotation(-pi / 2),
+    ).createShader(rect);
+
+    final glowPaint = Paint()
+      ..shader = shader
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 18
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    canvas.drawArc(rect, -pi / 2, sweepAngle, false, glowPaint..color = fillColor.withValues(alpha: 0.5));
+
     final fillPaint = Paint()
-      ..color = fillColor
+      ..shader = shader
       ..style = PaintingStyle.stroke
       ..strokeWidth = 10
       ..strokeCap = StrokeCap.round;
-
-    final sweepAngle = 2 * pi * progress;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -pi / 2,
-      sweepAngle,
-      false,
-      fillPaint,
-    );
+    canvas.drawArc(rect, -pi / 2, sweepAngle, false, fillPaint);
   }
 
   @override
@@ -329,11 +432,11 @@ class _FindMyCarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paintRoad = Paint()..color = Colors.white;
+    final paintRoad = Paint()..color = colors.mapRoad;
     canvas.drawRect(Rect.fromLTWH(0, size.height * 0.5, size.width, 24), paintRoad);
 
     final dashPaint = Paint()
-      ..color = Colors.black
+      ..color = colors.textPrimary
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
 
@@ -346,7 +449,7 @@ class _FindMyCarPainter extends CustomPainter {
     canvas.drawLine(corner, end, dashPaint);
 
     // Current location dot
-    canvas.drawCircle(start, 5, Paint()..color = Colors.black);
+    canvas.drawCircle(start, 5, Paint()..color = colors.textPrimary);
 
     // Car pin
     canvas.drawRRect(
@@ -359,5 +462,5 @@ class _FindMyCarPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _FindMyCarPainter oldDelegate) => oldDelegate.colors != colors;
 }

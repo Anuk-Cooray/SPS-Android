@@ -1,0 +1,442 @@
+{
+  "demand_sweep": [
+    {
+      "demand_per_hour": 30,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 45.93,
+          "turnover_at_peak": 0.95,
+          "rejection_rate_pct": 20.85,
+          "mean_walking_distance_m": 150.61,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 6496.92,
+          "lot_utilisation_pct": 48.54,
+          "turnover_at_peak": 0.99,
+          "rejection_rate_pct": 16.35,
+          "mean_walking_distance_m": 149.42,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 6.77,
+          "slot_minutes_recovered": 6451.25,
+          "lot_utilisation_pct": 48.7,
+          "turnover_at_peak": 0.99,
+          "rejection_rate_pct": 16.21,
+          "mean_walking_distance_m": 148.29,
+          "upgrade_acceptance_pct": 97.1
+        }
+      }
+    },
+    {
+      "demand_per_hour": 50,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 52.83,
+          "turnover_at_peak": 1.16,
+          "rejection_rate_pct": 45.95,
+          "mean_walking_distance_m": 153.49,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 7451.56,
+          "lot_utilisation_pct": 57.15,
+          "turnover_at_peak": 1.23,
+          "rejection_rate_pct": 41.9,
+          "mean_walking_distance_m": 153.17,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 7.73,
+          "slot_minutes_recovered": 7484.59,
+          "lot_utilisation_pct": 57.28,
+          "turnover_at_peak": 1.25,
+          "rejection_rate_pct": 41.75,
+          "mean_walking_distance_m": 152.17,
+          "upgrade_acceptance_pct": 96.47
+        }
+      }
+    },
+    {
+      "demand_per_hour": 75,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 55.88,
+          "turnover_at_peak": 1.29,
+          "rejection_rate_pct": 61.06,
+          "mean_walking_distance_m": 153.86,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 8480.67,
+          "lot_utilisation_pct": 60.97,
+          "turnover_at_peak": 1.4,
+          "rejection_rate_pct": 57.63,
+          "mean_walking_distance_m": 154.36,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 6.63,
+          "slot_minutes_recovered": 8385.87,
+          "lot_utilisation_pct": 61.09,
+          "turnover_at_peak": 1.4,
+          "rejection_rate_pct": 57.7,
+          "mean_walking_distance_m": 153.37,
+          "upgrade_acceptance_pct": 97.44
+        }
+      }
+    },
+    {
+      "demand_per_hour": 100,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 58.33,
+          "turnover_at_peak": 1.31,
+          "rejection_rate_pct": 69.05,
+          "mean_walking_distance_m": 154.88,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 9505.47,
+          "lot_utilisation_pct": 63.55,
+          "turnover_at_peak": 1.45,
+          "rejection_rate_pct": 66.09,
+          "mean_walking_distance_m": 154.05,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 6.18,
+          "slot_minutes_recovered": 9159.55,
+          "lot_utilisation_pct": 63.72,
+          "turnover_at_peak": 1.45,
+          "rejection_rate_pct": 66.22,
+          "mean_walking_distance_m": 153.43,
+          "upgrade_acceptance_pct": 96.2
+        }
+      }
+    }
+  ],
+  "no_show_sweep": [
+    {
+      "no_show_rate": 0.05,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 58.83,
+          "turnover_at_peak": 1.38,
+          "rejection_rate_pct": 52.66,
+          "mean_walking_distance_m": 153.98,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 3100.74,
+          "lot_utilisation_pct": 60.54,
+          "turnover_at_peak": 1.42,
+          "rejection_rate_pct": 51.19,
+          "mean_walking_distance_m": 153.68,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 6.6,
+          "slot_minutes_recovered": 3093.77,
+          "lot_utilisation_pct": 60.76,
+          "turnover_at_peak": 1.42,
+          "rejection_rate_pct": 51.19,
+          "mean_walking_distance_m": 152.7,
+          "upgrade_acceptance_pct": 96.48
+        }
+      }
+    },
+    {
+      "no_show_rate": 0.1,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 55.79,
+          "turnover_at_peak": 1.3,
+          "rejection_rate_pct": 52.66,
+          "mean_walking_distance_m": 153.8,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 6373.07,
+          "lot_utilisation_pct": 59.39,
+          "turnover_at_peak": 1.37,
+          "rejection_rate_pct": 49.39,
+          "mean_walking_distance_m": 153.8,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 7.22,
+          "slot_minutes_recovered": 6482.51,
+          "lot_utilisation_pct": 59.39,
+          "turnover_at_peak": 1.37,
+          "rejection_rate_pct": 49.36,
+          "mean_walking_distance_m": 152.6,
+          "upgrade_acceptance_pct": 96.79
+        }
+      }
+    },
+    {
+      "no_show_rate": 0.15,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 52.99,
+          "turnover_at_peak": 1.25,
+          "rejection_rate_pct": 52.66,
+          "mean_walking_distance_m": 153.78,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 9536.52,
+          "lot_utilisation_pct": 58.22,
+          "turnover_at_peak": 1.35,
+          "rejection_rate_pct": 47.94,
+          "mean_walking_distance_m": 153.5,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 7.55,
+          "slot_minutes_recovered": 9643.29,
+          "lot_utilisation_pct": 58.3,
+          "turnover_at_peak": 1.34,
+          "rejection_rate_pct": 47.87,
+          "mean_walking_distance_m": 152.63,
+          "upgrade_acceptance_pct": 96.31
+        }
+      }
+    },
+    {
+      "no_show_rate": 0.2,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 49.51,
+          "turnover_at_peak": 1.17,
+          "rejection_rate_pct": 52.66,
+          "mean_walking_distance_m": 153.71,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 13557.27,
+          "lot_utilisation_pct": 56.62,
+          "turnover_at_peak": 1.3,
+          "rejection_rate_pct": 46.24,
+          "mean_walking_distance_m": 153.47,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 7.88,
+          "slot_minutes_recovered": 13694.41,
+          "lot_utilisation_pct": 56.68,
+          "turnover_at_peak": 1.29,
+          "rejection_rate_pct": 46.09,
+          "mean_walking_distance_m": 152.14,
+          "upgrade_acceptance_pct": 97.64
+        }
+      }
+    }
+  ],
+  "delay_sweep": [
+    {
+      "mean_delay_min": 0.0,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 55.17,
+          "turnover_at_peak": 1.29,
+          "rejection_rate_pct": 52.14,
+          "mean_walking_distance_m": 152.98,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 7539.55,
+          "lot_utilisation_pct": 59.72,
+          "turnover_at_peak": 1.38,
+          "rejection_rate_pct": 48.49,
+          "mean_walking_distance_m": 153.21,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 7.41,
+          "slot_minutes_recovered": 7719.51,
+          "lot_utilisation_pct": 59.76,
+          "turnover_at_peak": 1.38,
+          "rejection_rate_pct": 48.4,
+          "mean_walking_distance_m": 152.06,
+          "upgrade_acceptance_pct": 96.62
+        }
+      }
+    },
+    {
+      "mean_delay_min": 3.0,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 54.67,
+          "turnover_at_peak": 1.27,
+          "rejection_rate_pct": 52.75,
+          "mean_walking_distance_m": 153.27,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 7848.14,
+          "lot_utilisation_pct": 59.06,
+          "turnover_at_peak": 1.36,
+          "rejection_rate_pct": 49.01,
+          "mean_walking_distance_m": 153.04,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 7.31,
+          "slot_minutes_recovered": 7946.15,
+          "lot_utilisation_pct": 59.09,
+          "turnover_at_peak": 1.37,
+          "rejection_rate_pct": 48.76,
+          "mean_walking_distance_m": 152.41,
+          "upgrade_acceptance_pct": 95.93
+        }
+      }
+    },
+    {
+      "mean_delay_min": 5.0,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 54.37,
+          "turnover_at_peak": 1.26,
+          "rejection_rate_pct": 52.88,
+          "mean_walking_distance_m": 153.1,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 7776.13,
+          "lot_utilisation_pct": 58.5,
+          "turnover_at_peak": 1.36,
+          "rejection_rate_pct": 49.42,
+          "mean_walking_distance_m": 152.65,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 6.81,
+          "slot_minutes_recovered": 7730.81,
+          "lot_utilisation_pct": 58.59,
+          "turnover_at_peak": 1.34,
+          "rejection_rate_pct": 49.42,
+          "mean_walking_distance_m": 152.15,
+          "upgrade_acceptance_pct": 95.98
+        }
+      }
+    },
+    {
+      "mean_delay_min": 10.0,
+      "policies": {
+        "B0_STATIC_FCFS": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 0.0,
+          "lot_utilisation_pct": 52.79,
+          "turnover_at_peak": 1.23,
+          "rejection_rate_pct": 54.14,
+          "mean_walking_distance_m": 153.26,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "walking_distance_saved_mean_m": 0.0,
+          "slot_minutes_recovered": 15327.23,
+          "lot_utilisation_pct": 54.85,
+          "turnover_at_peak": 1.25,
+          "rejection_rate_pct": 46.99,
+          "mean_walking_distance_m": 152.74,
+          "upgrade_acceptance_pct": 0.0
+        },
+        "D3_FULL_DYNAMIC": {
+          "walking_distance_saved_mean_m": 7.06,
+          "slot_minutes_recovered": 15370.24,
+          "lot_utilisation_pct": 54.97,
+          "turnover_at_peak": 1.25,
+          "rejection_rate_pct": 46.83,
+          "mean_walking_distance_m": 151.91,
+          "upgrade_acceptance_pct": 97.27
+        }
+      }
+    }
+  ],
+  "acceptance_sweep": [
+    {
+      "acceptance_probability_assumption": 0.3,
+      "results": {
+        "walking_distance_saved_mean_m": 2.32,
+        "slot_minutes_recovered": 7622.15,
+        "lot_utilisation_pct": 58.89,
+        "turnover_at_peak": 1.36,
+        "rejection_rate_pct": 48.83,
+        "mean_walking_distance_m": 153.61,
+        "upgrade_acceptance_pct": 29.97
+      }
+    },
+    {
+      "acceptance_probability_assumption": 0.5,
+      "results": {
+        "walking_distance_saved_mean_m": 4.09,
+        "slot_minutes_recovered": 7555.12,
+        "lot_utilisation_pct": 58.97,
+        "turnover_at_peak": 1.36,
+        "rejection_rate_pct": 48.82,
+        "mean_walking_distance_m": 153.37,
+        "upgrade_acceptance_pct": 52.93
+      }
+    },
+    {
+      "acceptance_probability_assumption": 0.7,
+      "results": {
+        "walking_distance_saved_mean_m": 5.36,
+        "slot_minutes_recovered": 7692.75,
+        "lot_utilisation_pct": 58.87,
+        "turnover_at_peak": 1.36,
+        "rejection_rate_pct": 48.81,
+        "mean_walking_distance_m": 152.99,
+        "upgrade_acceptance_pct": 69.92
+      }
+    },
+    {
+      "acceptance_probability_assumption": 0.9,
+      "results": {
+        "walking_distance_saved_mean_m": 6.26,
+        "slot_minutes_recovered": 7704.55,
+        "lot_utilisation_pct": 58.88,
+        "turnover_at_peak": 1.36,
+        "rejection_rate_pct": 48.85,
+        "mean_walking_distance_m": 152.81,
+        "upgrade_acceptance_pct": 89.91
+      }
+    }
+  ]
+}

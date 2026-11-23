@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../core/widgets/campus_map_view.dart';
+import '../../core/widgets/hold_countdown_timer_widget.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/services/parking_state_manager.dart';
 
@@ -28,6 +30,24 @@ class NavigationScreen extends StatefulWidget {
 }
 
 class _NavigationScreenState extends State<NavigationScreen> {
+  bool _modalShownForCurrentOffer = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final state = context.watch<ParkingStateManager>();
+    if (state.upgradeOfferAvailable && !_modalShownForCurrentOffer) {
+      _modalShownForCurrentOffer = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onTriggerUpgradeOffer();
+        }
+      });
+    } else if (!state.upgradeOfferAvailable) {
+      _modalShownForCurrentOffer = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -41,73 +61,106 @@ class _NavigationScreenState extends State<NavigationScreen> {
       backgroundColor: c.background,
       body: Stack(
         children: [
-          // 1. Campus Map Canvas with Route Line
+          // 1. Campus Map Canvas with Dynamic Route & Moving Vehicle Marker
           Positioned.fill(
             child: CampusMapView(
               lots: state.lots,
               showNavigationRoute: true,
               destinationSlotId: active.slotId,
+              routeProgress: state.routeProgress,
             ),
           ),
 
-          // 2. Top Turn-by-Turn Guidance Banner
+          // 2. Top Turn-by-Turn Dynamic Guidance Banner with Return Button
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpace.lg,
                 vertical: AppSpace.sm,
               ),
-              child: Container(
-                padding: const EdgeInsets.all(AppSpace.md),
-                decoration: BoxDecoration(
-                  color: c.primary,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    )
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.turn_right_rounded,
-                      color: c.onPrimary,
-                      size: 36,
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    margin: const EdgeInsets.only(right: AppSpace.sm),
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.cardSm),
+                      border: Border.all(color: c.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: AppSpace.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+                    child: IconButton(
+                      icon: Icon(Icons.arrow_back_rounded, color: c.textPrimary, size: 22),
+                      tooltip: 'Return to Main Screen',
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpace.md),
+                      decoration: BoxDecoration(
+                        color: state.hasArrivedAtDestination ? c.accent : c.primary,
+                        borderRadius: BorderRadius.circular(AppRadius.card),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          )
+                        ],
+                      ),
+                      child: Row(
                         children: [
-                          Text(
-                            '350 m',
-                            style: AppText.h2.copyWith(
-                              color: c.onPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          Icon(
+                            state.currentManeuverIcon,
+                            color: c.onPrimary,
+                            size: 30,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Turn right onto New Kandy Rd',
-                            style: AppText.body.copyWith(
-                              color: c.onPrimary.withValues(alpha: 0.8),
-                              fontSize: 13,
+                          const SizedBox(width: AppSpace.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  state.currentManeuverDistance,
+                                  style: AppText.h2.copyWith(
+                                    color: c.onPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  state.currentManeuverText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.body.copyWith(
+                                    color: c.onPrimary.withValues(alpha: 0.88),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
 
-          // 3. Bottom ETA & Active Booking Sheet
+          // 3. Bottom ETA & Active Booking Sheet with Simulation Controller
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -180,16 +233,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: AppSpace.md),
+                  const SizedBox(height: AppSpace.sm),
 
-                  // Progress Bar
+                  // Route Progress Bar
                   ClipRRect(
                     borderRadius: BorderRadius.circular(3),
                     child: LinearProgressIndicator(
-                      value: 0.65,
+                      value: state.routeProgress,
                       minHeight: 5,
                       backgroundColor: c.divider,
-                      valueColor: AlwaysStoppedAnimation<Color>(c.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(c.accent),
                     ),
                   ),
 
@@ -210,14 +263,118 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: AppSpace.lg),
+                  const SizedBox(height: AppSpace.sm),
+                  HoldCountdownTimerWidget(booking: active, compact: true),
+                  const SizedBox(height: AppSpace.md),
+
+                  // In-Transit Simulation Controller Bar (Examiner / Demo Evaluation Only)
+                  if (AppConfig.kDemoMode) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: c.surfaceMuted,
+                        borderRadius: BorderRadius.circular(AppRadius.cardSm),
+                        border: Border.all(color: c.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: state.hasArrivedAtDestination
+                                          ? c.accent
+                                          : (state.isSimulatingMovement ? c.accent : c.textTertiary),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    state.hasArrivedAtDestination
+                                        ? 'ARRIVED AT DESTINATION'
+                                        : (state.isSimulatingMovement
+                                            ? 'SIMULATING ROUTE'
+                                            : 'SIMULATION PAUSED'),
+                                    style: AppText.overline.copyWith(
+                                      color: state.isSimulatingMovement ? c.accent : c.textSecondary,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    iconSize: 18,
+                                    tooltip: 'Reset to Start',
+                                    icon: Icon(Icons.replay_rounded, color: c.textSecondary),
+                                    onPressed: () => state.resetMovementSimulation(),
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    iconSize: 18,
+                                    tooltip: 'Step Forward (+10%)',
+                                    icon: Icon(Icons.skip_next_rounded, color: c.textPrimary),
+                                    onPressed: () => state.tickSimulation(step: 0.10),
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    iconSize: 22,
+                                    tooltip: state.isSimulatingMovement ? 'Pause' : 'Start Auto Driving',
+                                    icon: Icon(
+                                      state.isSimulatingMovement
+                                          ? Icons.pause_circle_filled_rounded
+                                          : Icons.play_circle_fill_rounded,
+                                      color: c.accent,
+                                    ),
+                                    onPressed: () {
+                                      if (state.isSimulatingMovement) {
+                                        state.pauseMovementSimulation();
+                                      } else {
+                                        state.startMovementSimulation();
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          SliderTheme(
+                            data: SliderThemeData(
+                              trackHeight: 3,
+                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                              activeTrackColor: c.accent,
+                              inactiveTrackColor: c.border,
+                              thumbColor: c.accent,
+                            ),
+                            child: Slider(
+                              value: state.routeProgress,
+                              min: 0.0,
+                              max: 1.0,
+                              onChanged: (val) => state.setRouteProgress(val),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpace.md),
+                  ],
 
                   // Action Buttons
                   Row(
                     children: [
                       Expanded(
-                        child: SecondaryButton(
-                          text: 'Show QR',
+                        child: PrimaryButton(
+                          text: state.hasArrivedAtDestination ? 'Scan Gate QR to Park' : 'Show Barrier QR',
                           icon: Icons.qr_code_2_rounded,
                           onPressed: widget.onShowQr,
                         ),
@@ -230,29 +387,32 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     ],
                   ),
 
-                  // In-transit dynamic triggers (for testing / real ETA trigger)
-                  const SizedBox(height: AppSpace.sm),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      TextButton.icon(
-                        icon: Icon(Icons.bolt_rounded, size: 16, color: c.accent),
-                        label: Text(
-                          'Test 10m Upgrade',
-                          style: AppText.caption.copyWith(color: c.accent),
+                  // In-transit dynamic triggers (for presentation testing)
+                  if (AppConfig.kDemoMode) ...[
+                    const SizedBox(height: AppSpace.xs),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton.icon(
+                          icon: Icon(Icons.bolt_rounded, size: 15, color: c.accent),
+                          label: Text(
+                            'Test 10m Upgrade',
+                            style: AppText.caption.copyWith(color: c.accent, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: widget.onTriggerUpgradeOffer,
                         ),
-                        onPressed: widget.onTriggerUpgradeOffer,
-                      ),
-                      TextButton.icon(
-                        icon: Icon(Icons.access_time_rounded, size: 16, color: c.warning),
-                        label: Text(
-                          'Test Late (+10m)',
-                          style: AppText.caption.copyWith(color: c.warning),
+                        const SizedBox(width: AppSpace.sm),
+                        TextButton.icon(
+                          icon: Icon(Icons.access_time_rounded, size: 15, color: c.warning),
+                          label: Text(
+                            'Test Late (+10m)',
+                            style: AppText.caption.copyWith(color: c.warning, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: widget.onTriggerLateArrival,
                         ),
-                        onPressed: widget.onTriggerLateArrival,
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

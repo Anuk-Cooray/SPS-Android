@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../data/models/booking_model.dart';
 import '../../data/models/parking_slot_model.dart';
+import 'engine/upgrade_evaluation_result.dart';
 
 class UpgradeOfferModal extends StatefulWidget {
   final Booking booking;
   final ParkingSlot newSlot;
+  final UpgradeEvaluationResult? evaluationResult;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
 
@@ -15,6 +18,7 @@ class UpgradeOfferModal extends StatefulWidget {
     super.key,
     required this.booking,
     required this.newSlot,
+    this.evaluationResult,
     required this.onAccept,
     required this.onDecline,
   });
@@ -23,6 +27,7 @@ class UpgradeOfferModal extends StatefulWidget {
     required BuildContext context,
     required Booking booking,
     required ParkingSlot newSlot,
+    UpgradeEvaluationResult? evaluationResult,
     required VoidCallback onAccept,
     required VoidCallback onDecline,
   }) {
@@ -33,6 +38,7 @@ class UpgradeOfferModal extends StatefulWidget {
       builder: (_) => UpgradeOfferModal(
         booking: booking,
         newSlot: newSlot,
+        evaluationResult: evaluationResult,
         onAccept: onAccept,
         onDecline: onDecline,
       ),
@@ -71,7 +77,10 @@ class _UpgradeOfferModalState extends State<UpgradeOfferModal> {
     final c = context.colors;
     final currentSlotId = widget.booking.slotId;
     final newSlotId = widget.newSlot.id;
-    final distanceSaved = 120; // 160m - 40m
+    final distanceSaved = widget.evaluationResult?.distanceSavedMeters ??
+        (160 - widget.newSlot.walkingDistanceMeters).clamp(10, 500);
+    final scoreImprovement = widget.evaluationResult?.scoreImprovementPoints;
+    final currentWalk = widget.newSlot.walkingDistanceMeters + distanceSaved;
 
     return Container(
       decoration: BoxDecoration(
@@ -147,7 +156,7 @@ class _UpgradeOfferModalState extends State<UpgradeOfferModal> {
 
           // Subtitle
           Text(
-            'A closer slot just opened in ${widget.booking.lotName}. Same price, same arrival time.',
+            'A closer slot just opened in ${widget.booking.lotName}. Same price, same arrival time.${scoreImprovement != null ? ' Match score improved +${scoreImprovement.toStringAsFixed(1)} pts.' : ''}',
             style: AppText.body.copyWith(color: c.textSecondary),
           ),
 
@@ -160,11 +169,7 @@ class _UpgradeOfferModalState extends State<UpgradeOfferModal> {
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(AppSpace.md),
-                  decoration: BoxDecoration(
-                    color: c.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    border: Border.all(color: c.border),
-                  ),
+                  decoration: glassDecoration(c),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -179,7 +184,7 @@ class _UpgradeOfferModalState extends State<UpgradeOfferModal> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '160 m walk',
+                        '$currentWalk m walk',
                         style: AppText.caption.copyWith(color: c.textSecondary),
                       ),
                     ],
@@ -201,12 +206,26 @@ class _UpgradeOfferModalState extends State<UpgradeOfferModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'New',
-                        style: AppText.caption.copyWith(
-                          color: c.accent,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'New',
+                            style: AppText.caption.copyWith(
+                              color: c.accent,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (scoreImprovement != null && scoreImprovement > 0)
+                            Text(
+                              '+${scoreImprovement.toStringAsFixed(0)} pts',
+                              style: AppText.caption.copyWith(
+                                color: c.accent,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -215,7 +234,7 @@ class _UpgradeOfferModalState extends State<UpgradeOfferModal> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '40 m walk · LKR ${widget.booking.estimatedFee}',
+                        '${widget.newSlot.walkingDistanceMeters} m walk · LKR ${widget.booking.estimatedFee}',
                         style: AppText.caption.copyWith(
                           color: c.textSecondary,
                           fontWeight: FontWeight.w600,

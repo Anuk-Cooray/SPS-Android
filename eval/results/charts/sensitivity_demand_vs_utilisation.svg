@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 420" width="100%" height="100%" style="background:#0F172A; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
+  <line x1="90" y1="360.0" x2="590" y2="360.0" stroke="#334155" stroke-dasharray="4,4" stroke-width="1"/>
+  <text x="78" y="364.0" fill="#94A3B8" font-size="12" text-anchor="end">0</text>
+  <line x1="90" y1="302.0" x2="590" y2="302.0" stroke="#334155" stroke-dasharray="4,4" stroke-width="1"/>
+  <text x="78" y="306.0" fill="#94A3B8" font-size="12" text-anchor="end">15</text>
+  <line x1="90" y1="244.0" x2="590" y2="244.0" stroke="#334155" stroke-dasharray="4,4" stroke-width="1"/>
+  <text x="78" y="248.0" fill="#94A3B8" font-size="12" text-anchor="end">31</text>
+  <line x1="90" y1="186.0" x2="590" y2="186.0" stroke="#334155" stroke-dasharray="4,4" stroke-width="1"/>
+  <text x="78" y="190.0" fill="#94A3B8" font-size="12" text-anchor="end">47</text>
+  <line x1="90" y1="128.0" x2="590" y2="128.0" stroke="#334155" stroke-dasharray="4,4" stroke-width="1"/>
+  <text x="78" y="132.0" fill="#94A3B8" font-size="12" text-anchor="end">63</text>
+  <line x1="90" y1="70.0" x2="590" y2="70.0" stroke="#334155" stroke-dasharray="4,4" stroke-width="1"/>
+  <text x="78" y="74.0" fill="#94A3B8" font-size="12" text-anchor="end">79</text>
+  <line x1="90.0" y1="70" x2="90.0" y2="360" stroke="#1E293B" stroke-width="1"/>
+  <text x="90.0" y="384" fill="#94A3B8" font-size="12" text-anchor="middle">30</text>
+  <line x1="232.9" y1="70" x2="232.9" y2="360" stroke="#1E293B" stroke-width="1"/>
+  <text x="232.9" y="384" fill="#94A3B8" font-size="12" text-anchor="middle">50</text>
+  <line x1="411.4" y1="70" x2="411.4" y2="360" stroke="#1E293B" stroke-width="1"/>
+  <text x="411.4" y="384" fill="#94A3B8" font-size="12" text-anchor="middle">75</text>
+  <line x1="590.0" y1="70" x2="590.0" y2="360" stroke="#1E293B" stroke-width="1"/>
+  <text x="590.0" y="384" fill="#94A3B8" font-size="12" text-anchor="middle">100</text>
+  <text x="90" y="32" fill="#F8FAFC" font-size="16" font-weight="bold">Sensitivity: Facility Utilization vs Traffic Demand</text>
+  <text x="90" y="52" fill="#94A3B8" font-size="12">Evaluates load scaling across 30 to 100 drivers/hour</text>
+  <text x="340.0" y="408" fill="#CBD5E1" font-size="12" font-weight="500" text-anchor="middle">Incoming Demand (Drivers / Hour)</text>
+  <text x="-215.0" y="25" fill="#94A3B8" font-size="12" font-weight="500" text-anchor="middle" transform="rotate(-90)">Lot Utilization (%)</text>
+  <line x1="90" y1="70" x2="90" y2="360" stroke="#64748B" stroke-width="1.5"/>
+  <line x1="90" y1="360" x2="590" y2="360" stroke="#64748B" stroke-width="1.5"/>
+  <polyline fill="none" stroke="#64748B" stroke-width="2.5" points="90.0,192.8 232.9,167.6 411.4,156.5 590.0,147.6"/>
+  <circle cx="90.0" cy="192.8" r="4" fill="#64748B" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="232.9" cy="167.6" r="4" fill="#64748B" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="411.4" cy="156.5" r="4" fill="#64748B" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="590.0" cy="147.6" r="4" fill="#64748B" stroke="#0F172A" stroke-width="2"/>
+  <line x1="610" y1="80" x2="628" y2="80" stroke="#64748B" stroke-width="2.5"/>
+  <circle cx="619" cy="80" r="3.5" fill="#64748B"/>
+  <text x="636" y="84" fill="#CBD5E1" font-size="11">B0 STATIC</text>
+  <polyline fill="none" stroke="#94A3B8" stroke-width="2.5" points="90.0,183.3 232.9,151.9 411.4,138.0 590.0,128.6"/>
+  <circle cx="90.0" cy="183.3" r="4" fill="#94A3B8" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="232.9" cy="151.9" r="4" fill="#94A3B8" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="411.4" cy="138.0" r="4" fill="#94A3B8" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="590.0" cy="128.6" r="4" fill="#94A3B8" stroke="#0F172A" stroke-width="2"/>
+  <line x1="610" y1="104" x2="628" y2="104" stroke="#94A3B8" stroke-width="2.5"/>
+  <circle cx="619" cy="104" r="3.5" fill="#94A3B8"/>
+  <text x="636" y="108" fill="#CBD5E1" font-size="11">B1 STATIC</text>
+  <polyline fill="none" stroke="#38BDF8" stroke-width="2.5" points="90.0,182.7 232.9,151.4 411.4,137.6 590.0,128.0"/>
+  <circle cx="90.0" cy="182.7" r="4" fill="#38BDF8" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="232.9" cy="151.4" r="4" fill="#38BDF8" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="411.4" cy="137.6" r="4" fill="#38BDF8" stroke="#0F172A" stroke-width="2"/>
+  <circle cx="590.0" cy="128.0" r="4" fill="#38BDF8" stroke="#0F172A" stroke-width="2"/>
+  <line x1="610" y1="128" x2="628" y2="128" stroke="#38BDF8" stroke-width="2.5"/>
+  <circle cx="619" cy="128" r="3.5" fill="#38BDF8"/>
+  <text x="636" y="132" fill="#CBD5E1" font-size="11">D3 FULL</text>
+</svg>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../data/models/booking_model.dart';
 
@@ -41,6 +42,7 @@ class CheckInScreen extends StatelessWidget {
                       border: Border.all(color: c.border),
                     ),
                     child: IconButton(
+                      tooltip: 'Back',
                       icon: Icon(Icons.chevron_left_rounded, color: c.textPrimary, size: 24),
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -119,11 +121,7 @@ class CheckInScreen extends StatelessWidget {
               // Barrier help box
               Container(
                 padding: const EdgeInsets.all(AppSpace.md),
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: c.border),
-                ),
+                decoration: glassDecoration(c),
                 child: Row(
                   children: [
                     Icon(Icons.info_outline_rounded, color: c.textPrimary, size: 20),

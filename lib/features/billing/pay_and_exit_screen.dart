@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/app_buttons.dart';
 import '../../data/models/booking_model.dart';
+import '../../data/services/parking_state_manager.dart';
 
 class PayAndExitScreen extends StatefulWidget {
   final Booking booking;
@@ -20,13 +24,33 @@ class PayAndExitScreen extends StatefulWidget {
 class _PayAndExitScreenState extends State<PayAndExitScreen> {
   int _selectedPaymentMethod = 0; // 0: Card, 1: Attendant QR
   bool _isProcessing = false;
+  // Freeze the stay at the moment the driver opened checkout so the total doesn't drift
+  final DateTime _exitAt = DateTime.now();
+
+  static String _formatStay(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    if (h == 0) return '$m min';
+    return m == 0 ? '$h h' : '$h h $m min';
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final baseFee = widget.booking.estimatedFee;
-    final extFee = widget.booking.extensionFee > 0 ? widget.booking.extensionFee : 50;
+    final state = context.watch<ParkingStateManager>();
+    // The booking handed to this screen can predate check-in; prefer the latest copy
+    final booking = state.bookings.firstWhere((b) => b.id == widget.booking.id, orElse: () => widget.booking);
+    final checkedIn = booking.checkedInAt?.toLocal();
+    final arrival = booking.arrivalTime.toLocal();
+    final parkedFrom = checkedIn ?? (arrival.isBefore(_exitAt) ? arrival : _exitAt);
+    final stay = _exitAt.isAfter(parkedFrom) ? _exitAt.difference(parkedFrom) : Duration.zero;
+    final baseFee = booking.parkingFeeFor(stay);
+    final extFee = booking.extensionFee;
     final totalDue = baseFee + extFee;
+    final card = state.currentUser.defaultPaymentMethod;
+    final hasCard = card != null && card.isNotEmpty;
+    final method = hasCard ? _selectedPaymentMethod : 1;
+    final timeFmt = DateFormat('h:mm a');
 
     return Scaffold(
       backgroundColor: c.background,
@@ -50,6 +74,7 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
                       border: Border.all(color: c.border),
                     ),
                     child: IconButton(
+                      tooltip: 'Back',
                       icon: Icon(Icons.chevron_left_rounded, color: c.textPrimary, size: 24),
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -80,7 +105,7 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                '${widget.booking.lotName} · 10:21 AM – 12:35 PM',
+                '${booking.lotName} · ${timeFmt.format(parkedFrom)} – ${timeFmt.format(_exitAt)}',
                 style: AppText.body.copyWith(color: c.textSecondary),
               ),
 
@@ -89,21 +114,21 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
               // Invoice itemized card
               Container(
                 padding: const EdgeInsets.all(AppSpace.lg),
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: c.border),
-                ),
+                decoration: glassDecoration(c),
                 child: Column(
                   children: [
-                    _buildInvoiceRow('Parking · 2 h 14 min', 'LKR $baseFee'),
-                    const SizedBox(height: AppSpace.sm),
-                    _buildInvoiceRow('Extension · 15 min', 'LKR $extFee'),
-                    const SizedBox(height: AppSpace.sm),
-                    _buildInvoiceRow(
-                      'Upgrade ${widget.booking.originalSlotId ?? 'A-06'} → ${widget.booking.slotId}',
-                      'LKR 0',
-                    ),
+                    _buildInvoiceRow('Parking · ${_formatStay(stay)}', 'LKR $baseFee'),
+                    if (extFee > 0) ...[
+                      const SizedBox(height: AppSpace.sm),
+                      _buildInvoiceRow('Hold extension', 'LKR $extFee'),
+                    ],
+                    if (booking.originalSlotId != null) ...[
+                      const SizedBox(height: AppSpace.sm),
+                      _buildInvoiceRow(
+                        'Upgrade ${booking.originalSlotId} → ${booking.slotId}',
+                        'Free',
+                      ),
+                    ],
                     const SizedBox(height: AppSpace.md),
                     const Divider(),
                     const SizedBox(height: AppSpace.md),
@@ -126,81 +151,91 @@ class _PayAndExitScreenState extends State<PayAndExitScreen> {
               const SizedBox(height: AppSpace.xs),
 
               // Option 1: Saved card
-              GestureDetector(
-                onTap: () => setState(() => _selectedPaymentMethod = 0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpace.md,
-                    vertical: AppSpace.md,
-                  ),
-                  decoration: BoxDecoration(
-                    color: c.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    border: Border.all(
-                      color: _selectedPaymentMethod == 0 ? c.textPrimary : c.border,
-                      width: _selectedPaymentMethod == 0 ? 1.5 : 1.0,
+              if (hasCard) ...[
+              Semantics(
+                inMutuallyExclusiveGroup: true,
+                checked: method == 0,
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedPaymentMethod = 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpace.md,
+                      vertical: AppSpace.md,
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _selectedPaymentMethod == 0
-                            ? Icons.radio_button_checked_rounded
-                            : Icons.radio_button_off_rounded,
-                        color: c.textPrimary,
-                        size: 20,
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      border: Border.all(
+                        color: method == 0 ? c.textPrimary : c.border,
+                        width: method == 0 ? 1.5 : 1.0,
                       ),
-                      const SizedBox(width: AppSpace.md),
-                      Expanded(
-                        child: Text(
-                          'Visa •••• 4821',
-                          style: AppText.title.copyWith(color: c.textPrimary),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          method == 0
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_off_rounded,
+                          color: c.textPrimary,
+                          size: 20,
                         ),
-                      ),
-                      Text(
-                        'Default',
-                        style: AppText.caption.copyWith(color: c.textSecondary),
-                      ),
-                    ],
+                        const SizedBox(width: AppSpace.md),
+                        Expanded(
+                          child: Text(
+                            card,
+                            style: AppText.title.copyWith(color: c.textPrimary),
+                          ),
+                        ),
+                        Text(
+                          'Default',
+                          style: AppText.caption.copyWith(color: c.textSecondary),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
 
               const SizedBox(height: AppSpace.xs),
+              ],
 
               // Option 2: Attendant QR
-              GestureDetector(
-                onTap: () => setState(() => _selectedPaymentMethod = 1),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpace.md,
-                    vertical: AppSpace.md,
-                  ),
-                  decoration: BoxDecoration(
-                    color: c.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    border: Border.all(
-                      color: _selectedPaymentMethod == 1 ? c.textPrimary : c.border,
-                      width: _selectedPaymentMethod == 1 ? 1.5 : 1.0,
+              Semantics(
+                inMutuallyExclusiveGroup: true,
+                checked: method == 1,
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedPaymentMethod = 1),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpace.md,
+                      vertical: AppSpace.md,
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _selectedPaymentMethod == 1
-                            ? Icons.radio_button_checked_rounded
-                            : Icons.radio_button_off_rounded,
-                        color: c.textPrimary,
-                        size: 20,
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      border: Border.all(
+                        color: method == 1 ? c.textPrimary : c.border,
+                        width: method == 1 ? 1.5 : 1.0,
                       ),
-                      const SizedBox(width: AppSpace.md),
-                      Expanded(
-                        child: Text(
-                          'Pay attendant with QR invoice',
-                          style: AppText.title.copyWith(color: c.textPrimary),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          method == 1
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_off_rounded,
+                          color: c.textPrimary,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: AppSpace.md),
+                        Expanded(
+                          child: Text(
+                            'Pay attendant with QR invoice',
+                            style: AppText.title.copyWith(color: c.textPrimary),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

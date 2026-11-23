@@ -7,7 +7,8 @@ enum ParkingEventType {
   cancelled,
   autoCancelled,
   checkedIn,
-  completed;
+  completed,
+  weightsTuned;
 
   String get displayName => switch (this) {
         ParkingEventType.booked => 'Booked',
@@ -19,6 +20,7 @@ enum ParkingEventType {
         ParkingEventType.autoCancelled => 'Auto-cancelled (No-show)',
         ParkingEventType.checkedIn => 'Checked In at Barrier',
         ParkingEventType.completed => 'Completed & Paid',
+        ParkingEventType.weightsTuned => 'Weights Tuned (Audited)',
       };
 }
 
@@ -38,4 +40,25 @@ class ParkingEvent {
     required this.description,
     this.metadata = const {},
   });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'bookingId': bookingId,
+        'type': type.name,
+        'timestamp': timestamp.toIso8601String(),
+        'description': description,
+        'metadata': metadata,
+      };
+
+  factory ParkingEvent.fromJson(Map<String, dynamic> json) => ParkingEvent(
+        id: json['id'] as String,
+        bookingId: json['bookingId'] as String,
+        type: ParkingEventType.values.firstWhere(
+          (t) => t.name == json['type'],
+          orElse: () => ParkingEventType.booked,
+        ),
+        timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '')?.toLocal() ?? DateTime.now(),
+        description: json['description'] as String? ?? '',
+        metadata: (json['metadata'] as Map<String, dynamic>?) ?? const {},
+      );
 }

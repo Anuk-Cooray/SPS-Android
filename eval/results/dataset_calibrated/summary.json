@@ -1,0 +1,581 @@
+{
+  "timestamp": "2026-10-22T09:58:51.760754",
+  "seeds": [
+    20261019,
+    20261020,
+    20261021,
+    20261022,
+    20261023,
+    20261024,
+    20261025,
+    20261026,
+    20261027,
+    20261028,
+    20261029,
+    20261030,
+    20261031,
+    20261032,
+    20261033,
+    20261034,
+    20261035,
+    20261036,
+    20261037,
+    20261038,
+    20261039,
+    20261040,
+    20261041,
+    20261042,
+    20261043,
+    20261044,
+    20261045,
+    20261046,
+    20261047,
+    20261048
+  ],
+  "profile": {
+    "source": "IIoT_Smart_Parking_Management.csv",
+    "rows": 1000,
+    "hourly_profile": [
+      0.7261,
+      0.6553,
+      0.7438,
+      0.797,
+      0.5844,
+      0.673,
+      0.7615,
+      0.6907,
+      0.6907,
+      0.7084,
+      0.549,
+      0.6376,
+      0.7084,
+      0.7084,
+      0.9563,
+      0.7615,
+      0.8678,
+      0.8855,
+      0.6553,
+      0.8147,
+      0.9386,
+      0.673,
+      0.9209,
+      0.6021
+    ],
+    "duration_mean_hours": 2.901,
+    "vehicle_cutoffs": [
+      0.191,
+      0.966
+    ],
+    "vehicle_mix_pct": {
+      "small": 19.1,
+      "medium": 77.5,
+      "large": 3.4
+    },
+    "slot_sizes": {
+      "small": 13,
+      "medium": 51,
+      "large": 8
+    }
+  },
+  "baseline_hourly_profile": [
+    0.15,
+    0.1,
+    0.08,
+    0.05,
+    0.08,
+    0.2,
+    0.55,
+    0.9,
+    1.45,
+    1.35,
+    1.1,
+    0.95,
+    1.05,
+    1.15,
+    0.9,
+    0.85,
+    1.4,
+    1.5,
+    1.2,
+    0.95,
+    0.7,
+    0.5,
+    0.35,
+    0.2
+  ],
+  "results": {
+    "baseline": {
+      "kpis": {
+        "B0_STATIC_FCFS": {
+          "lot_utilisation_pct": {
+            "mean": 54.599,
+            "ci_margin_95": 0.591
+          },
+          "rejection_rate_pct": {
+            "mean": 53.032,
+            "ci_margin_95": 0.685
+          },
+          "mean_walking_distance_m": {
+            "mean": 154.02,
+            "ci_margin_95": 0.64
+          },
+          "slot_minutes_recovered": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          }
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "lot_utilisation_pct": {
+            "mean": 59.005,
+            "ci_margin_95": 0.487
+          },
+          "rejection_rate_pct": {
+            "mean": 49.22,
+            "ci_margin_95": 0.708
+          },
+          "mean_walking_distance_m": {
+            "mean": 153.884,
+            "ci_margin_95": 0.555
+          },
+          "slot_minutes_recovered": {
+            "mean": 7643.773,
+            "ci_margin_95": 347.569
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          }
+        },
+        "D1_SCORING_ONLY": {
+          "lot_utilisation_pct": {
+            "mean": 54.604,
+            "ci_margin_95": 0.612
+          },
+          "rejection_rate_pct": {
+            "mean": 53.019,
+            "ci_margin_95": 0.686
+          },
+          "mean_walking_distance_m": {
+            "mean": 154.023,
+            "ci_margin_95": 0.655
+          },
+          "slot_minutes_recovered": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          }
+        },
+        "D2_SCORING_AUTO_RELEASE": {
+          "lot_utilisation_pct": {
+            "mean": 58.998,
+            "ci_margin_95": 0.496
+          },
+          "rejection_rate_pct": {
+            "mean": 49.211,
+            "ci_margin_95": 0.714
+          },
+          "mean_walking_distance_m": {
+            "mean": 153.935,
+            "ci_margin_95": 0.53
+          },
+          "slot_minutes_recovered": {
+            "mean": 7618.04,
+            "ci_margin_95": 360.568
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          }
+        },
+        "D3_FULL_DYNAMIC": {
+          "lot_utilisation_pct": {
+            "mean": 59.056,
+            "ci_margin_95": 0.507
+          },
+          "rejection_rate_pct": {
+            "mean": 49.085,
+            "ci_margin_95": 0.725
+          },
+          "mean_walking_distance_m": {
+            "mean": 152.838,
+            "ci_margin_95": 0.578
+          },
+          "slot_minutes_recovered": {
+            "mean": 7746.767,
+            "ci_margin_95": 353.956
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 7.21,
+            "ci_margin_95": 0.538
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 97.842,
+            "ci_margin_95": 1.03
+          }
+        }
+      },
+      "wilcoxon": {
+        "D3_FULL_DYNAMIC_vs_B0_STATIC_FCFS": {
+          "lot_utilisation_pct": {
+            "statistic_W": 0,
+            "z_score": 4.7719,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "rejection_rate_pct": {
+            "statistic_W": 0,
+            "z_score": 4.7722,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "mean_walking_distance_m": {
+            "statistic_W": 57.5,
+            "z_score": 3.5893,
+            "p_value": 0.000332,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "slot_minutes_recovered": {
+            "statistic_W": 0,
+            "z_score": 4.7719,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "walking_distance_saved_mean_m": {
+            "statistic_W": 0,
+            "z_score": 4.772,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "upgrade_acceptance_pct": {
+            "statistic_W": 0,
+            "z_score": 4.8791,
+            "p_value": 1e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          }
+        },
+        "D3_FULL_DYNAMIC_vs_B1_STATIC_AUTO_RELEASE": {
+          "lot_utilisation_pct": {
+            "statistic_W": 184.0,
+            "z_score": 0.9875,
+            "p_value": 0.323403,
+            "n_effective": 30,
+            "significant_at_05": false,
+            "significant_at_01": false
+          },
+          "rejection_rate_pct": {
+            "statistic_W": 99.0,
+            "z_score": 2.1521,
+            "p_value": 0.031389,
+            "n_effective": 27,
+            "significant_at_05": true,
+            "significant_at_01": false
+          },
+          "mean_walking_distance_m": {
+            "statistic_W": 28.0,
+            "z_score": 4.1962,
+            "p_value": 2.7e-05,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "slot_minutes_recovered": {
+            "statistic_W": 165.0,
+            "z_score": 1.3781,
+            "p_value": 0.168179,
+            "n_effective": 30,
+            "significant_at_05": false,
+            "significant_at_01": false
+          },
+          "walking_distance_saved_mean_m": {
+            "statistic_W": 0,
+            "z_score": 4.772,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "upgrade_acceptance_pct": {
+            "statistic_W": 0,
+            "z_score": 4.8791,
+            "p_value": 1e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          }
+        }
+      }
+    },
+    "calibrated": {
+      "kpis": {
+        "B0_STATIC_FCFS": {
+          "lot_utilisation_pct": {
+            "mean": 69.803,
+            "ci_margin_95": 0.573
+          },
+          "rejection_rate_pct": {
+            "mean": 50.203,
+            "ci_margin_95": 0.689
+          },
+          "mean_walking_distance_m": {
+            "mean": 158.319,
+            "ci_margin_95": 0.752
+          },
+          "slot_minutes_recovered": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          }
+        },
+        "B1_STATIC_AUTO_RELEASE": {
+          "lot_utilisation_pct": {
+            "mean": 77.093,
+            "ci_margin_95": 0.336
+          },
+          "rejection_rate_pct": {
+            "mean": 45.03,
+            "ci_margin_95": 0.857
+          },
+          "mean_walking_distance_m": {
+            "mean": 158.124,
+            "ci_margin_95": 0.467
+          },
+          "slot_minutes_recovered": {
+            "mean": 11869.323,
+            "ci_margin_95": 522.798
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          }
+        },
+        "D1_SCORING_ONLY": {
+          "lot_utilisation_pct": {
+            "mean": 69.792,
+            "ci_margin_95": 0.568
+          },
+          "rejection_rate_pct": {
+            "mean": 50.207,
+            "ci_margin_95": 0.692
+          },
+          "mean_walking_distance_m": {
+            "mean": 158.279,
+            "ci_margin_95": 0.761
+          },
+          "slot_minutes_recovered": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          }
+        },
+        "D2_SCORING_AUTO_RELEASE": {
+          "lot_utilisation_pct": {
+            "mean": 77.084,
+            "ci_margin_95": 0.336
+          },
+          "rejection_rate_pct": {
+            "mean": 45.04,
+            "ci_margin_95": 0.852
+          },
+          "mean_walking_distance_m": {
+            "mean": 158.089,
+            "ci_margin_95": 0.5
+          },
+          "slot_minutes_recovered": {
+            "mean": 11906.187,
+            "ci_margin_95": 511.664
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 0.0,
+            "ci_margin_95": 0.0
+          }
+        },
+        "D3_FULL_DYNAMIC": {
+          "lot_utilisation_pct": {
+            "mean": 77.158,
+            "ci_margin_95": 0.384
+          },
+          "rejection_rate_pct": {
+            "mean": 45.023,
+            "ci_margin_95": 0.839
+          },
+          "mean_walking_distance_m": {
+            "mean": 156.942,
+            "ci_margin_95": 0.505
+          },
+          "slot_minutes_recovered": {
+            "mean": 11933.787,
+            "ci_margin_95": 570.209
+          },
+          "walking_distance_saved_mean_m": {
+            "mean": 6.818,
+            "ci_margin_95": 0.528
+          },
+          "upgrade_acceptance_pct": {
+            "mean": 97.564,
+            "ci_margin_95": 1.078
+          }
+        }
+      },
+      "wilcoxon": {
+        "D3_FULL_DYNAMIC_vs_B0_STATIC_FCFS": {
+          "lot_utilisation_pct": {
+            "statistic_W": 0,
+            "z_score": 4.7726,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "rejection_rate_pct": {
+            "statistic_W": 0,
+            "z_score": 4.7719,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "mean_walking_distance_m": {
+            "statistic_W": 75.5,
+            "z_score": 3.2191,
+            "p_value": 0.001286,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "slot_minutes_recovered": {
+            "statistic_W": 0,
+            "z_score": 4.7719,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "walking_distance_saved_mean_m": {
+            "statistic_W": 0,
+            "z_score": 4.772,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "upgrade_acceptance_pct": {
+            "statistic_W": 0,
+            "z_score": 4.8443,
+            "p_value": 1e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          }
+        },
+        "D3_FULL_DYNAMIC_vs_B1_STATIC_AUTO_RELEASE": {
+          "lot_utilisation_pct": {
+            "statistic_W": 159.5,
+            "z_score": 1.4921,
+            "p_value": 0.13568,
+            "n_effective": 30,
+            "significant_at_05": false,
+            "significant_at_01": false
+          },
+          "rejection_rate_pct": {
+            "statistic_W": 210.5,
+            "z_score": 0.1406,
+            "p_value": 0.888163,
+            "n_effective": 29,
+            "significant_at_05": false,
+            "significant_at_01": false
+          },
+          "mean_walking_distance_m": {
+            "statistic_W": 23.0,
+            "z_score": 4.2992,
+            "p_value": 1.7e-05,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "slot_minutes_recovered": {
+            "statistic_W": 205.0,
+            "z_score": 0.5553,
+            "p_value": 0.578659,
+            "n_effective": 30,
+            "significant_at_05": false,
+            "significant_at_01": false
+          },
+          "walking_distance_saved_mean_m": {
+            "statistic_W": 0,
+            "z_score": 4.772,
+            "p_value": 2e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          },
+          "upgrade_acceptance_pct": {
+            "statistic_W": 0,
+            "z_score": 4.8443,
+            "p_value": 1e-06,
+            "n_effective": 30,
+            "significant_at_05": true,
+            "significant_at_01": true
+          }
+        }
+      }
+    }
+  },
+  "notes": "Dataset is synthetic (Kaggle); used only for distributions that map onto the simulator."
+}

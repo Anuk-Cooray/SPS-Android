@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_buttons.dart';
+import '../../core/widgets/glass_card.dart';
+import '../../data/services/email_otp_auth.dart';
 import '../../data/services/parking_state_manager.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,28 +19,23 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'anuk@example.com');
+  // 0: Email Entry, 1: 6-Digit OTP Verification
+  int _step = 0;
+
+  final _emailController = TextEditingController(
+    text: AppConfig.kDemoMode ? 'anuk@example.com' : '',
+  );
   final List<TextEditingController> _otpControllers =
       List.generate(6, (i) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (i) => FocusNode());
 
-  int _resendCountdown = 42;
+  int _resendCountdown = 0;
   Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Pre-fill first 3 digits as in mockup
-    _otpControllers[0].text = '4';
-    _otpControllers[1].text = '8';
-    _otpControllers[2].text = '2';
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendCountdown > 0) {
-        setState(() => _resendCountdown--);
-      }
-    });
-  }
+  bool _isSending = false;
+  bool _isVerifying = false;
+  String? _emailError;
+  String? _otpError;
+  String? _lastSentCode;
 
   @override
   void dispose() {
@@ -51,12 +50,181 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleContinue() {
-    final email = _emailController.text.trim();
-    if (email.isNotEmpty) {
-      context.read<ParkingStateManager>().login(email);
-      widget.onLoginSuccess();
+  void _startCountdown([int seconds = 60]) {
+    _timer?.cancel();
+    _resendCountdown = seconds;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendCountdown > 0) {
+        setState(() => _resendCountdown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  bool _validateEmail(String email) {
+    final emailRegex = RegExp(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$');
+    return emailRegex.hasMatch(email);
+  }
+
+  String _getOtpValue() {
+    return _otpControllers.map((c) => c.text.trim()).join();
+  }
+
+  void _autoFillCode() {
+    if (_lastSentCode == null || _lastSentCode!.length != 6) return;
+    for (int i = 0; i < 6; i++) {
+      _otpControllers[i].text = _lastSentCode![i];
     }
+    setState(() {
+      _otpError = null;
+    });
+    _focusNodes[5].unfocus();
+  }
+
+  void _handleSendCode() async {
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      setState(() => _emailError = 'Please enter your email address');
+      return;
+    }
+
+    if (!_validateEmail(email)) {
+      setState(() => _emailError = 'Please enter a valid campus email (e.g. name@sliit.lk)');
+      return;
+    }
+
+    setState(() {
+      _emailError = null;
+      _isSending = true;
+    });
+
+    try {
+      final state = context.read<ParkingStateManager>();
+      final code = await state.sendVerificationOtp(email);
+
+      if (!mounted) return;
+
+      // Clear any previous OTP inputs
+      for (var c in _otpControllers) {
+        c.clear();
+      }
+
+      setState(() {
+        _lastSentCode = code;
+        _isSending = false;
+        _otpError = null;
+        _step = 1;
+      });
+
+      _startCountdown(60);
+
+      // Focus first digit box after transition
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _focusNodes.isNotEmpty) {
+          _focusNodes[0].requestFocus();
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSending = false;
+        _emailError = e is OtpAuthException
+            ? e.message
+            : 'Failed to generate verification code. Please try again.';
+      });
+    }
+  }
+
+  void _handleVerifyCode() async {
+    final email = _emailController.text.trim();
+    final otp = _getOtpValue();
+
+    if (otp.length < 6) {
+      setState(() => _otpError = 'Please enter the complete 6-digit verification code');
+      return;
+    }
+
+    setState(() {
+      _otpError = null;
+      _isVerifying = true;
+    });
+
+    final state = context.read<ParkingStateManager>();
+    final result = await state.verifyOtp(email, otp);
+
+    if (!mounted) return;
+
+    if (result.isValid) {
+      setState(() => _isVerifying = false);
+      widget.onLoginSuccess();
+    } else {
+      setState(() {
+        _isVerifying = false;
+        _otpError = result.errorMessage ?? 'Invalid verification code';
+      });
+    }
+  }
+
+  void _handleResendCode() async {
+    if (_resendCountdown > 0) return;
+
+    final email = _emailController.text.trim();
+    setState(() {
+      _otpError = null;
+      _isSending = true;
+    });
+
+    final state = context.read<ParkingStateManager>();
+    final String? code;
+    try {
+      code = await state.sendVerificationOtp(email);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSending = false;
+        _otpError = e is OtpAuthException
+            ? e.message
+            : 'Failed to generate verification code. Please try again.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+
+    for (var c in _otpControllers) {
+      c.clear();
+    }
+
+    setState(() {
+      _lastSentCode = code;
+      _isSending = false;
+    });
+
+    _startCountdown(60);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('A fresh 6-digit code has been issued for $email'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+
+    if (_focusNodes.isNotEmpty) {
+      _focusNodes[0].requestFocus();
+    }
+  }
+
+  void _selectPresetEmail(String email) {
+    setState(() {
+      _emailController.text = email;
+      _emailError = null;
+    });
   }
 
   @override
@@ -65,174 +233,471 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: c.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+      body: Stack(
+        children: [
+          // Navy backdrop with two soft glows (blue top-right, teal bottom-left)
+          const Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: AppEffects.backdrop))),
+          Positioned(top: -120, right: -80, child: _glowOrb(c.accent, 320)),
+          Positioned(bottom: -140, left: -100, child: _glowOrb(c.success, 300)),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                // Phone-width column, centred on tablets
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: _step == 0 ? _buildEmailStep(c) : _buildOtpStep(c),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _glowOrb(Color color, double size) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color.withValues(alpha: 0.28), color.withValues(alpha: 0)]),
+        ),
+      ),
+    );
+  }
+
+  // --- Step 1: Email Address Entry ---
+  Widget _buildEmailStep(AppColors c) {
+    return Column(
+      key: const ValueKey('email_step'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: AppSpace.xl),
+
+        // Brand mark
+        Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: AppEffects.hero,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: AppEffects.glow(c.accent, strength: 0.5),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'P',
+                style: AppText.h1.copyWith(
+                  color: c.onPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            Text('Smart Parking', style: AppText.title.copyWith(color: c.textPrimary)),
+          ],
+        ),
+
+        const SizedBox(height: AppSpace.xl),
+
+        // Title & Description
+        Text('Park smarter.', style: AppText.h1.copyWith(color: c.textPrimary, fontSize: 32)),
+        ShaderMask(
+          shaderCallback: (bounds) => LinearGradient(colors: [c.accent, c.success]).createShader(bounds),
+          child: Text('Book in seconds.', style: AppText.h1.copyWith(color: Colors.white, fontSize: 32)),
+        ),
+
+        const SizedBox(height: AppSpace.xs),
+
+        Text(
+          "Enter your campus email and we'll send you a 6-digit code. No password needed — new drivers are set up automatically.",
+          style: AppText.body.copyWith(color: c.textSecondary),
+        ),
+
+        const SizedBox(height: AppSpace.xl),
+
+        GlassCard(
+          padding: const EdgeInsets.all(AppSpace.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: AppSpace.xxl),
-
-              // Logo badge
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: c.primary,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'P',
-                  style: AppText.h1.copyWith(
-                    color: c.onPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: AppSpace.xl),
-
-              // Title
-              Text(
-                'Park smarter.\nBook in seconds.',
-                style: AppText.h1.copyWith(color: c.textPrimary),
-              ),
-
-              const SizedBox(height: AppSpace.sm),
-
-              // Subtitle
-              Text(
-                "Enter your email. We'll send you a 6-digit verification code.",
-                style: AppText.body.copyWith(color: c.textSecondary),
-              ),
-
-              const SizedBox(height: AppSpace.xxl),
-
-              // Email Field
-              Text('Email', style: AppText.label.copyWith(color: c.textSecondary)),
+            // Preset quick chips for convenient campus testing
+            if (AppConfig.kDemoMode) ...[
+              Text('DEMO ACCOUNTS', style: AppText.overline.copyWith(color: c.textSecondary)),
               const SizedBox(height: AppSpace.xs),
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                style: AppText.body.copyWith(
-                  color: c.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(
-                    Icons.mail_outline_rounded,
-                    color: c.textSecondary,
-                    size: 20,
+              Wrap(
+                spacing: AppSpace.xs,
+                runSpacing: AppSpace.xs,
+                children: [
+                  ActionChip(
+                    avatar: const Icon(Icons.account_circle_outlined, size: 16),
+                    label: const Text('anuk@example.com'),
+                    onPressed: () => _selectPresetEmail('anuk@example.com'),
                   ),
-                  hintText: 'name@example.com',
-                ),
+                  ActionChip(
+                    avatar: const Icon(Icons.school_outlined, size: 16),
+                    label: const Text('driver@sliit.lk'),
+                    onPressed: () => _selectPresetEmail('driver@sliit.lk'),
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                    label: const Text('New driver'),
+                    tooltip: 'Fills newdriver@sliit.lk, an account with no vehicle yet',
+                    onPressed: () => _selectPresetEmail('newdriver@sliit.lk'),
+                  ),
+                ],
               ),
-
               const SizedBox(height: AppSpace.xl),
+            ],
 
-              // Verification code
-              Text(
-                'Verification code',
-                style: AppText.label.copyWith(color: c.textSecondary),
+            // Email Field
+            Text('Campus Email Address', style: AppText.label.copyWith(color: c.textSecondary)),
+            const SizedBox(height: AppSpace.xs),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.email],
+              style: AppText.body.copyWith(
+                color: c.textPrimary,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(height: AppSpace.xs),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(6, (index) {
-                  final isFocused = index == 3;
-                  return SizedBox(
-                    width: 48,
-                    height: 56,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: c.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isFocused ? c.accent : c.border,
-                          width: isFocused ? 2 : 1,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: TextField(
-                        controller: _otpControllers[index],
-                        focusNode: _focusNodes[index],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        maxLength: 1,
-                        style: AppText.h2.copyWith(
-                          color: c.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        decoration: const InputDecoration(
-                          counterText: '',
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onChanged: (val) {
-                          if (val.isNotEmpty && index < 5) {
-                            _focusNodes[index + 1].requestFocus();
-                          }
-                        },
-                      ),
-                    ),
-                  );
-                }),
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.mail_outline_rounded,
+                  color: c.textSecondary,
+                  size: 20,
+                ),
+                hintText: 'name@sliit.lk',
+                errorText: _emailError,
               ),
+              onChanged: (_) {
+                if (_emailError != null) setState(() => _emailError = null);
+              },
+              onSubmitted: (_) => _handleSendCode(),
+            ),
 
-              const SizedBox(height: AppSpace.sm),
+            const SizedBox(height: AppSpace.xxl),
 
-              Text(
-                'Code sent to your inbox · Resend in 0:${_resendCountdown.toString().padLeft(2, '0')}',
-                style: AppText.caption.copyWith(color: c.textSecondary),
-              ),
+            // Send Code Action Button
+            PrimaryButton(
+              text: 'Send Verification Code',
+              icon: Icons.arrow_forward_rounded,
+              isLoading: _isSending,
+              onPressed: _handleSendCode,
+            ),
 
-              const Spacer(),
+            const SizedBox(height: AppSpace.md),
 
-              // Continue Button
-              PrimaryButton(
-                text: 'Continue',
-                onPressed: _handleContinue,
-              ),
-
-              const SizedBox(height: AppSpace.md),
-
-              // Terms
-              Center(
-                child: Text.rich(
-                  TextSpan(
-                    text: 'By continuing you agree to the ',
-                    style: AppText.caption.copyWith(color: c.textSecondary),
-                    children: [
-                      TextSpan(
-                        text: 'Terms',
-                        style: TextStyle(
-                          color: c.textPrimary,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                      const TextSpan(text: ' and '),
-                      TextSpan(
-                        text: 'Privacy Policy',
-                        style: TextStyle(
-                          color: c.textPrimary,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                      const TextSpan(text: '.'),
-                    ],
-                  ),
+            // Terms Footnote
+            Center(
+              child: Text.rich(
+                TextSpan(
+                  text: 'By continuing you agree to the ',
+                  style: AppText.caption.copyWith(color: c.textSecondary),
+                  children: [
+                    // Plain text until Terms / Privacy pages exist; underlined text implies a link
+                    TextSpan(text: 'Terms', style: TextStyle(color: c.textPrimary)),
+                    const TextSpan(text: ' and '),
+                    TextSpan(text: 'Privacy Policy', style: TextStyle(color: c.textPrimary)),
+                    const TextSpan(text: '.'),
+                  ],
                 ),
               ),
-
-              const SizedBox(height: AppSpace.md),
+            ),
             ],
           ),
         ),
-      ),
+
+        const SizedBox(height: AppSpace.xl),
+      ],
+    );
+  }
+
+  // --- Step 2: 6-Digit OTP Entry ---
+  Widget _buildOtpStep(AppColors c) {
+    final email = _emailController.text.trim();
+
+    return Column(
+      key: const ValueKey('otp_step'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: AppSpace.lg),
+
+        // Navigation row to go back
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _step = 0;
+                  _otpError = null;
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.arrow_back_rounded, size: 20, color: c.textPrimary),
+                    const SizedBox(width: AppSpace.xs),
+                    Text(
+                      'Change Email',
+                      style: AppText.body.copyWith(
+                        color: c.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: c.surfaceMuted,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Step 2 of 2',
+                style: AppText.caption.copyWith(
+                  color: c.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: AppSpace.xl),
+
+        // Title
+        Text(
+          'Verify your email',
+          style: AppText.h1.copyWith(color: c.textPrimary),
+        ),
+
+        const SizedBox(height: AppSpace.xs),
+
+        // Subtitle with destination email
+        Text.rich(
+          TextSpan(
+            text: 'We sent a 6-digit verification code to\n',
+            style: AppText.body.copyWith(color: c.textSecondary),
+            children: [
+              TextSpan(
+                text: email,
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: AppSpace.lg),
+
+        // In-App Verification Alert Banner (Research & Testing Convenience)
+        if (AppConfig.kDemoMode && _lastSentCode != null)
+          Container(
+            padding: const EdgeInsets.all(AppSpace.md),
+            decoration: BoxDecoration(
+              color: c.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: c.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: c.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: c.border),
+                  ),
+                  child: Icon(Icons.mark_email_read_rounded, color: c.textPrimary, size: AppIconSize.md),
+                ),
+                const SizedBox(width: AppSpace.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Demo code  $_lastSentCode',
+                        style: AppText.body.copyWith(
+                          color: c.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Shown on the local emulators only; a live backend emails it.',
+                        style: AppText.caption.copyWith(color: c.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: _autoFillCode,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    backgroundColor: c.surface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: c.border),
+                    ),
+                  ),
+                  child: Text(
+                    'Auto-fill code',
+                    style: AppText.caption.copyWith(
+                      color: c.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: AppSpace.xl),
+
+        Text(
+          'Enter 6-Digit Code',
+          style: AppText.label.copyWith(color: c.textSecondary),
+        ),
+        const SizedBox(height: AppSpace.sm),
+
+        // 6 Digit Box Row with Auto-Advance & Pasting
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(6, (index) {
+            return SizedBox(
+              width: 48,
+              height: 56,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _focusNodes[index].hasFocus || _otpControllers[index].text.isNotEmpty
+                        ? c.textPrimary
+                        : c.border,
+                    width: _focusNodes[index].hasFocus ? 2 : 1,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: TextField(
+                  controller: _otpControllers[index],
+                  focusNode: _focusNodes[index],
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  maxLength: 1,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  style: AppText.h2.copyWith(
+                    color: c.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  decoration: const InputDecoration(
+                    counterText: '',
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onChanged: (val) {
+                    if (_otpError != null) {
+                      setState(() => _otpError = null);
+                    }
+
+                    if (val.isNotEmpty) {
+                      if (index < 5) {
+                        _focusNodes[index + 1].requestFocus();
+                      } else {
+                        _focusNodes[index].unfocus();
+                      }
+                    } else if (val.isEmpty && index > 0) {
+                      _focusNodes[index - 1].requestFocus();
+                    }
+                  },
+                ),
+              ),
+            );
+          }),
+        ),
+
+        if (_otpError != null) ...[
+          const SizedBox(height: AppSpace.sm),
+          Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: c.danger, size: 16),
+              const SizedBox(width: AppSpace.xs),
+              Expanded(
+                child: Text(
+                  _otpError!,
+                  style: AppText.caption.copyWith(color: c.danger, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ],
+
+        const SizedBox(height: AppSpace.md),
+
+        // Resend Timer Row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _resendCountdown > 0
+                  ? 'Resend code in 0:${_resendCountdown.toString().padLeft(2, '0')}'
+                  : 'Didn\'t receive the code?',
+              style: AppText.caption.copyWith(color: c.textSecondary),
+            ),
+            if (_resendCountdown == 0)
+              InkWell(
+                onTap: _handleResendCode,
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Text(
+                    'Resend code',
+                    style: AppText.caption.copyWith(
+                      color: c.textPrimary,
+                      decoration: TextDecoration.underline,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+
+        const SizedBox(height: AppSpace.xxl),
+
+        // Verify & Continue Button
+        PrimaryButton(
+          text: 'Verify & Continue',
+          isLoading: _isVerifying,
+          onPressed: _handleVerifyCode,
+        ),
+
+        const SizedBox(height: AppSpace.xl),
+      ],
     );
   }
 }
